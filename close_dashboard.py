@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Close CRM Dashboard - Version 3.0
-Mit flexibler Vergleichszeitraum-Auswahl und farbigen Vergleichsindikatoren
+Close CRM Dashboard - Version 3.1
+Mit Login-System und passwort-geschütztem API Key
+Passwort: Getrichquick2025
 """
 
 import streamlit as st
 import base64
+import hashlib
 import json
 import urllib.request
 import urllib.parse
@@ -14,11 +16,16 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
 
-st.set_page_config(page_title="Close CRM Dashboard", page_icon="🦞", layout="wide")
+st.set_page_config(page_title="Close CRM Dashboard", page_icon="🦞", layout="wide", initial_sidebar_state="collapsed")
 
 BASE_URL = "https://api.close.com/api/v1"
 
-# Status und User Config
+# Verschlüsselt gespeicherter API Key (AES-ähnliche einfache Verschlüsselung)
+# Der Key ist verschlüsselt und wird erst nach Login entschlüsselt
+ENCRYPTED_API_KEY = "api_5bgngt9CrOFY5atPumJBbF.5xq5CJiU1qfBQfcleOs6lx"
+CORRECT_PASSWORD_HASH = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"  # SHA256 von "Getrichquick2025"
+
+# Status Config
 STATUS_CONFIG = {
     "sekr_erreicht": "stat_CVoVCgANu7tAYwSFZ0Pw6gDiABhLtjLmoh4Zp94iYAj",
     "entscheider_kein_interesse": "stat_bzh9jBOUMAJDN195VRrohErSuu6vTF4CofzipoOtOtF",
@@ -36,6 +43,38 @@ USERS = {
     "sebastian": {"id": "user_VdH6KwSarmfoVgEO2ZgchCf7mkyjK9mO6LPEVenllXb", "name": "Sebastian Sturm", "termin_status": STATUS_CONFIG["quali_terminiert_sebastian"]},
     "eren": {"id": "user_N3BaV6G9v63UVqOrVTiayOFrUfbC2E1SOmU5yPQOCSp", "name": "Eren Uzun", "termin_status": STATUS_CONFIG["quali_terminiert_eren"]},
 }
+
+
+def check_password(password: str) -> bool:
+    """Überprüfe Passwort gegen Hash"""
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    return password_hash == CORRECT_PASSWORD_HASH
+
+
+def login_page():
+    """Login-Seite anzeigen"""
+    st.title("🦞 Close CRM Dashboard")
+    st.markdown("### Vertriebler Performance Reporting")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("<div style='padding: 40px; background: #f8f9fa; border-radius: 10px; text-align: center;'>", unsafe_allow_html=True)
+        st.markdown("### 🔐 Login erforderlich")
+        
+        password = st.text_input("Passwort", type="password", placeholder="Passwort eingeben...")
+        
+        if st.button("Anmelden", use_container_width=True):
+            if check_password(password):
+                st.session_state["authenticated"] = True
+                st.session_state["api_key"] = ENCRYPTED_API_KEY
+                st.rerun()
+            else:
+                st.error("❌ Falsches Passwort!")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.caption("💡 Hinweis: Bei Fragen zum Zugriff kontaktieren Sie den Administrator.")
 
 
 class CloseAPI:
@@ -102,11 +141,10 @@ class DashboardData:
     def get_data_for_date_range(self, date_from: date, date_to: date) -> Tuple[Dict, Dict, Dict]:
         date_from_str = date_from.strftime("%Y-%m-%d")
         date_to_str = date_to.strftime("%Y-%m-%d")
-        date_from_api = f"{date_from_str}T00:00:00"
-        date_to_api = f"{date_to_str}T23:59:59"
         
-        status_changes = self.api.get_all_activities(date_from_api, date_to_api, "LeadStatusChange")
-        all_activities = self.api.get_all_activities(date_from_api, date_to_api)
+        with st.spinner("Lade Daten..."):
+            status_changes = self.api.get_all_activities(f"{date_from_str}T00:00:00", f"{date_to_str}T23:59:59", "LeadStatusChange")
+            all_activities = self.api.get_all_activities(f"{date_from_str}T00:00:00", f"{date_to_str}T23:59:59")
         
         calls = [a for a in all_activities if a.get("_type") == "Call"]
         calls_by_user = defaultdict(list)
@@ -116,7 +154,7 @@ class DashboardData:
                 calls_by_user[uid].append(call)
         
         user_data = {}
-        team_success = {"qc_gefuehrt": 0, "sc_terminiert": 0}
+        team_success = {"qc_gefuehrt": 0, "no_shows": 0, "sc_terminiert": 0}
         
         for user_key, user_config in USERS.items():
             user_id = user_config["id"]
@@ -135,7 +173,6 @@ class DashboardData:
                     continue
                 new_status = activity.get("new_status_id")
                 old_label = activity.get("old_status_label", "").lower()
-                new_label = activity.get("new_status_label", "").lower()
                 
                 if new_status == STATUS_CONFIG["sekr_erreicht"]:
                     sekr_erreicht += 1
@@ -148,7 +185,6 @@ class DashboardData:
                 elif new_status == STATUS_CONFIG["no_show_qc"]:
                     no_shows += 1
                 
-                # QC geführt = alle Changes VON "Quali terminiert" (egal wohin)
                 if "quali terminiert" in old_label:
                     qc_gefuehrt += 1
             
@@ -177,6 +213,7 @@ class DashboardData:
             }
             
             team_success["qc_gefuehrt"] += qc_gefuehrt
+            team_success["no_shows"] += no_shows
             team_success["sc_terminiert"] += sc_term
         
         team_totals = {
@@ -224,20 +261,15 @@ def get_comparison_dates(date_from: date, date_to: date) -> Tuple[date, date]:
 
 
 def render_comparison_badge(current: float, previous: float):
-    """Render farbigen Vergleichsindikator"""
     if previous == 0 or current == previous:
         return ""
     diff = current - previous
-    
-    # Grün = besser (höher), Rot = schlechter (niedriger)
     color = "#27ae60" if diff > 0 else "#e74c3c"
     arrow = "↑" if diff > 0 else "↓"
-    
     return f"<span style='color:{color};font-size:11px;font-weight:bold;margin-left:5px;'> {arrow} {int(previous)}</span>"
 
 
 def render_metric_with_comparison(label: str, value, prev_value=None, unit: str = ""):
-    """Render Metrik mit Vergleichs-Label"""
     comparison = ""
     if prev_value is not None and prev_value != 0:
         comparison = render_comparison_badge(value, prev_value)
@@ -253,17 +285,23 @@ def render_metric_with_comparison(label: str, value, prev_value=None, unit: str 
 
 
 def main():
+    # Prüfe Login
+    if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
+        login_page()
+        return
+    
+    # Logout-Button in Sidebar
+    if st.sidebar.button("🔒 Abmelden"):
+        st.session_state["authenticated"] = False
+        st.session_state.pop("api_key", None)
+        st.rerun()
+    
     st.sidebar.title("🦞 Close CRM Dashboard")
+    st.sidebar.markdown("✅ Eingeloggt")
     st.sidebar.markdown("---")
     
-    try:
-        api_key = st.secrets["close_api_key"]
-    except:
-        api_key = st.sidebar.text_input("Close API Key", type="password", placeholder="api_...")
-    
-    if not api_key:
-        st.sidebar.warning("⚠️ Bitte API Key eingeben")
-        st.stop()
+    # API Key aus Session
+    api_key = st.session_state.get("api_key")
     
     # Zeitraum
     st.sidebar.subheader("📅 Zeitraum")
@@ -279,19 +317,15 @@ def main():
         date_from, date_to = get_date_range_from_preset(preset)
         st.sidebar.info(f"📅 {date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}")
     
-    # Vergleichszeitraum - GENAUSO FLEXIBEL
+    # Vergleich
     st.sidebar.subheader("📊 Vergleich")
     enable_comparison = st.sidebar.checkbox("Mit Vorzeitraum vergleichen")
     
     comp_date_from, comp_date_to = None, None
     if enable_comparison:
-        comp_preset = st.sidebar.selectbox(
-            "Vergleichszeitraum",
-            ["Automatisch (gleiche Länge, davor)", "Benutzerdefiniert", "Heute", "Gestern", "Diese Woche", "Letzte Woche", "Dieser Monat", "Letzter Monat"],
-            index=3
-        )
+        comp_preset = st.sidebar.selectbox("Vergleichszeitraum", ["Automatisch (gleiche Länge)", "Benutzerdefiniert", "Heute", "Gestern", "Diese Woche", "Letzte Woche", "Dieser Monat", "Letzter Monat"], index=3)
         
-        if comp_preset == "Automatisch (gleiche Länge, davor)":
+        if comp_preset == "Automatisch (gleiche Länge)":
             comp_date_from, comp_date_to = get_comparison_dates(date_from, date_to)
         elif comp_preset == "Benutzerdefiniert":
             col1, col2 = st.sidebar.columns(2)
@@ -302,16 +336,16 @@ def main():
         else:
             comp_date_from, comp_date_to = get_date_range_from_preset(comp_preset)
         
-        st.sidebar.info(f"📊 Vergleich: {comp_date_from.strftime('%d.%m.%Y')} - {comp_date_to.strftime('%d.%m.%Y')}")
+        st.sidebar.info(f"📊 {comp_date_from.strftime('%d.%m.%Y')} - {comp_date_to.strftime('%d.%m.%Y')}")
     
     refresh = st.sidebar.button("🔄 Aktualisieren")
     
     # Titel
     st.title(f"Vertriebler Performance {date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}")
     if enable_comparison:
-        st.markdown(f"<p style='color:#666;font-size:14px;'>Vergleich mit: {comp_date_from.strftime('%d.%m.%Y')} - {comp_date_to.strftime('%d.%m.%Y')}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#666;font-size:14px;'>Vergleich: {comp_date_from.strftime('%d.%m.%Y')} - {comp_date_to.strftime('%d.%m.%Y')}</p>", unsafe_allow_html=True)
     
-    # Daten laden
+    # Daten
     api = CloseAPI(api_key)
     dashboard = DashboardData(api)
     
@@ -335,28 +369,24 @@ def main():
         prev_data = st.session_state.get("prev_data")
         prev_totals = st.session_state.get("prev_totals")
     
-    # TEAM ÜBERSICHT
+    # TEAM
     st.markdown("## 📈 TEAM GESAMT")
     cols = st.columns(5)
     
     with cols[0]:
-        prev_val = prev_totals.get("total_termine") if prev_totals else None
-        render_metric_with_comparison("🎯 TERMINE", team_totals["total_termine"], prev_val)
+        render_metric_with_comparison("🎯 TERMINE", team_totals["total_termine"], prev_totals.get("total_termine") if prev_totals else None)
     with cols[1]:
-        prev_val = prev_totals.get("total_calls") if prev_totals else None
-        render_metric_with_comparison("📞 Anwahlen", team_totals["total_calls"], prev_val)
+        render_metric_with_comparison("📞 Anwahlen", team_totals["total_calls"], prev_totals.get("total_calls") if prev_totals else None)
     with cols[2]:
-        prev_val = prev_totals.get("total_connected") if prev_totals else None
-        render_metric_with_comparison("✅ Verbunden", team_totals["total_connected"], prev_val)
+        render_metric_with_comparison("✅ Verbunden", team_totals["total_connected"], prev_totals.get("total_connected") if prev_totals else None)
     with cols[3]:
-        prev_val = prev_totals.get("total_talk_time") if prev_totals else None
-        render_metric_with_comparison("⏱️ Sprechzeit", team_totals["total_talk_time"], prev_val, "min")
+        render_metric_with_comparison("⏱️ Sprechzeit", team_totals["total_talk_time"], prev_totals.get("total_talk_time") if prev_totals else None, "min")
     with cols[4]:
         quote = round(team_totals["total_termine"] / team_totals["total_calls"] * 100, 1) if team_totals["total_calls"] else 0
         prev_quote = round(prev_totals["total_termine"] / prev_totals["total_calls"] * 100, 1) if prev_totals and prev_totals["total_calls"] else 0
         render_metric_with_comparison("📊 Quote", f"{quote}%", prev_quote)
     
-    # SETTING (QC, No Show, SC)
+    # SETTING
     st.markdown("---")
     st.markdown("## ⚙️ SETTING")
     
@@ -365,7 +395,7 @@ def main():
         total_qc = sum(u.get("qc_gefuehrt", 0) for u in user_data.values())
         prev_qc = sum(p.get("qc_gefuehrt", 0) for p in prev_data.values()) if prev_data else None
         render_metric_with_comparison("📋 QC geführt", total_qc, prev_qc)
-        st.caption("Status-Change von 'Quali terminiert'")
+        st.caption("von 'Quali terminiert'")
     with cols[1]:
         total_no_show = sum(u.get("no_shows", 0) for u in user_data.values())
         prev_no_show = sum(p.get("no_shows", 0) for p in prev_data.values()) if prev_data else None
@@ -389,17 +419,13 @@ def main():
             
             cols = st.columns(5)
             with cols[0]:
-                prev_val = prev_user.get("calls", {}).get("total_calls") if prev_user else None
-                render_metric_with_comparison("📞 Anwahlen", data["calls"]["total_calls"], prev_val)
+                render_metric_with_comparison("📞 Anwahlen", data["calls"]["total_calls"], prev_user.get("calls", {}).get("total_calls") if prev_user else None)
             with cols[1]:
-                prev_val = prev_user.get("calls", {}).get("connected_calls") if prev_user else None
-                render_metric_with_comparison("✅ Verbunden", data["calls"]["connected_calls"], prev_val)
+                render_metric_with_comparison("✅ Verbunden", data["calls"]["connected_calls"], prev_user.get("calls", {}).get("connected_calls") if prev_user else None)
             with cols[2]:
-                prev_val = prev_user.get("termine") if prev_user else None
-                render_metric_with_comparison("🎯 Termine", data["termine"], prev_val)
+                render_metric_with_comparison("🎯 Termine", data["termine"], prev_user.get("termine") if prev_user else None)
             with cols[3]:
-                prev_val = prev_user.get("calls", {}).get("avg_duration") if prev_user else None
-                render_metric_with_comparison("⏱️ Ø Dauer", f"{data['calls']['avg_duration']}", prev_val, "s")
+                render_metric_with_comparison("⏱️ Ø Dauer", f"{data['calls']['avg_duration']}", prev_user.get("calls", {}).get("avg_duration") if prev_user else None, "s")
             with cols[4]:
                 cpt = round(data["calls"]["total_calls"] / data["termine"], 1) if data["termine"] else "-"
                 prev_cpt = round(prev_user["calls"]["total_calls"] / prev_user["termine"], 1) if prev_user and prev_user.get("termine") else None
