@@ -312,18 +312,10 @@ def render_user_section(name: str, data: Dict):
 # ═════════════════════════════════════════════════════════════════════════════
 
 def get_api_key():
-    """API Key aus Streamlit Secrets oder Eingabe"""
-    try:
-        # Versuche aus Secrets zu laden (für Streamlit Cloud)
-        return st.secrets["close_api_key"]
-    except:
-        # Sonst Benutzereingabe
-        return st.sidebar.text_input(
-            "Close API Key", 
-            type="password",
-            placeholder="api_...",
-            help="Dein Close CRM API Key"
-        )
+    """API Key - direkt hinterlegt für sofortigen Zugriff"""
+    # WICHTIG: Dieser Key ist öffentlich sichtbar im Repository!
+    # Für produktive Nutzung besser als Streamlit Secret hinterlegen
+    return "api_5bgngt9CrOFY5atPumJBbF.5xq5CJiU1qfBQfcleOs6lx"
 
 
 def main():
@@ -333,9 +325,8 @@ def main():
     
     api_key = get_api_key()
     
-    if not api_key:
-        st.sidebar.warning("⚠️ Bitte API Key eingeben")
-        st.stop()
+    # Zeige Hinweis dass Key hinterlegt ist
+    st.sidebar.success("✅ API Key hinterlegt")
     
     # Datumsauswahl
     st.sidebar.subheader("📅 Zeitraum")
