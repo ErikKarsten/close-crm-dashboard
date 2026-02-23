@@ -218,7 +218,10 @@ class DashboardData:
                 if "quali terminiert" in old_label or "quali_terminiert" in old_label:
                     qc_gefuehrt += 1
             
-            # Entscheider erreicht = Verbunden - Sekretariat
+            # An VZ gescheitert = Verbunden - An Entscheider gescheitert
+            sekr_erreicht = max(0, call_metrics["connected_calls"] - kein_interesse)
+            
+            # Entscheider erreicht = Verbunden - An VZ gescheitert
             entscheider_erreicht = max(0, call_metrics["connected_calls"] - sekr_erreicht)
             
             # Quoten berechnen
