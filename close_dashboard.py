@@ -205,6 +205,7 @@ class DashboardData:
                 
                 new_status = activity.get("new_status_id")
                 old_label = activity.get("old_status_label", "").lower()
+                new_label = activity.get("new_status_label", "").lower()
                 
                 if new_status == STATUS_CONFIG["sekr_erreicht"]:
                     sekr_erreicht += 1
@@ -217,7 +218,9 @@ class DashboardData:
                 elif new_status == STATUS_CONFIG["sc_terminiert"]:
                     sc_term += 1
                 
-                if "quali terminiert" in old_label or "quali_terminiert" in old_label:
+                # QC geführt = Status-Change VON "Quali terminiert" ZU etwas anderem
+                # (aber nicht zu einem anderen "Quali terminiert" Status)
+                if "quali terminiert" in old_label and "quali terminiert" not in new_label:
                     qc_gefuehrt += 1
             
             # An VZ gescheitert = Verbunden - An Entscheider gescheitert
