@@ -23,7 +23,7 @@ BASE_URL = "https://api.close.com/api/v1"
 # Verschlüsselt gespeicherter API Key (AES-ähnliche einfache Verschlüsselung)
 # Der Key ist verschlüsselt und wird erst nach Login entschlüsselt
 ENCRYPTED_API_KEY = "api_5bgngt9CrOFY5atPumJBbF.5xq5CJiU1qfBQfcleOs6lx"
-CORRECT_PASSWORD_HASH = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"  # SHA256 von "Getrichquick2025"
+CORRECT_PASSWORD_HASH = "088d2a3bb2d70f11bdb7c138875851e0369a04d23f7697501cbacfb1b6604391"  # SHA256 von "Getrichquick2025"
 
 # Status Config
 STATUS_CONFIG = {
