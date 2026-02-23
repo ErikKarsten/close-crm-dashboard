@@ -27,6 +27,7 @@ STATUS_CONFIG = {
     "quali_terminiert_sebastian": "stat_vKldwcyB9741E8NX3TA3qkRDJagRzFIOXLW3abkHW6v",
     "quali_terminiert_eren": "stat_jGwFvdSSBBZV2ljhIqht1ymA1lr0swoEKQJkUwMLTzW",
     "sc_terminiert": "stat_s1QLeMGJ9CjlCSF9J9jmhkBFqPySFhsIhYM35rhh9Tp",
+    "no_show_qc": "stat_2TXvU9dFI9aRV1GDcbGfsBVR1bZiImfzip3EakHDBTV",
 }
 
 USERS = {
@@ -126,6 +127,7 @@ class DashboardData:
             kein_interesse = 0
             termine = 0
             qc_gefuehrt = 0
+            no_shows = 0
             sc_term = 0
             
             for activity in status_changes:
@@ -143,8 +145,11 @@ class DashboardData:
                     termine += 1
                 elif new_status == STATUS_CONFIG["sc_terminiert"]:
                     sc_term += 1
+                elif new_status == STATUS_CONFIG["no_show_qc"]:
+                    no_shows += 1
                 
-                if "quali terminiert" in old_label and "quali terminiert" not in new_label:
+                # QC geführt = alle Changes VON "Quali terminiert" (egal wohin)
+                if "quali terminiert" in old_label:
                     qc_gefuehrt += 1
             
             sekr_erreicht = max(0, call_metrics["connected_calls"] - kein_interesse)
@@ -167,6 +172,7 @@ class DashboardData:
                 "entscheider_erreicht": entscheider_erreicht,
                 "quotas": quotas,
                 "qc_gefuehrt": qc_gefuehrt,
+                "no_shows": no_shows,
                 "sc_terminiert": sc_term,
             }
             
@@ -349,6 +355,27 @@ def main():
         quote = round(team_totals["total_termine"] / team_totals["total_calls"] * 100, 1) if team_totals["total_calls"] else 0
         prev_quote = round(prev_totals["total_termine"] / prev_totals["total_calls"] * 100, 1) if prev_totals and prev_totals["total_calls"] else 0
         render_metric_with_comparison("📊 Quote", f"{quote}%", prev_quote)
+    
+    # SETTING (QC, No Show, SC)
+    st.markdown("---")
+    st.markdown("## ⚙️ SETTING")
+    
+    cols = st.columns(3)
+    with cols[0]:
+        total_qc = sum(u.get("qc_gefuehrt", 0) for u in user_data.values())
+        prev_qc = sum(p.get("qc_gefuehrt", 0) for p in prev_data.values()) if prev_data else None
+        render_metric_with_comparison("📋 QC geführt", total_qc, prev_qc)
+        st.caption("Status-Change von 'Quali terminiert'")
+    with cols[1]:
+        total_no_show = sum(u.get("no_shows", 0) for u in user_data.values())
+        prev_no_show = sum(p.get("no_shows", 0) for p in prev_data.values()) if prev_data else None
+        render_metric_with_comparison("🏃 No Show", total_no_show, prev_no_show)
+        st.caption("Status 'No Show QC'")
+    with cols[2]:
+        total_sc = sum(u.get("sc_terminiert", 0) for u in user_data.values())
+        prev_sc = sum(p.get("sc_terminiert", 0) for p in prev_data.values()) if prev_data else None
+        render_metric_with_comparison("📞 SC terminiert", total_sc, prev_sc)
+        st.caption("Status 'SC terminiert'")
     
     # EINZELREPORTING
     st.markdown("---")
