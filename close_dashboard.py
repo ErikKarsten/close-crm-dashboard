@@ -172,8 +172,12 @@ class DashboardData:
                     sekr_erreicht += 1
                 elif new_status == STATUS_CONFIG["entscheider_kein_interesse"]:
                     kein_interesse += 1
+                # WICHTIG: Termine zählen basierend auf Status-Change Datum
+                # (wann wurde der Termin GELEGT, nicht aktueller Status)
                 elif new_status == user_config["termin_status"]:
                     termine += 1
+                    # Debug: Zeige welche Termine gefunden wurden
+                    # print(f"Termin gefunden: {activity.get('date_created')} - Lead: {activity.get('lead_id')}")
                 elif new_status == STATUS_CONFIG["sc_terminiert"]:
                     sc_term += 1
                 
@@ -413,6 +417,9 @@ def main():
         st.title(f"Vertriebler Performance - {date_from.strftime('%d.%m.%Y')}")
     else:
         st.title(f"Vertriebler Performance - {date_from.strftime('%d.%m.%Y')} bis {date_to.strftime('%d.%m.%Y')}")
+    
+    # Hinweis zur Berechnung
+    st.info("💡 **Hinweis:** Termine werden basierend auf dem Zeitpunkt des Status-Changes gezählt (wann der Termin gelegt wurde), nicht basierend auf dem aktuellen Lead-Status. Auch wenn sich der Status mittlerweile geändert hat (z.B. zu No Show oder SC Terminiert), wird der Termin in der ursprünglichen Woche gezählt.")
     
     api = CloseAPI(api_key)
     dashboard = DashboardData(api)
