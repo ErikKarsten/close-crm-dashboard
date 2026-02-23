@@ -48,7 +48,6 @@ STATUS_CONFIG = {
     "quali_terminiert_luk": "stat_6JP3mHvQnVmEUpOgdDcLy0YnB8ZN3ubqzFZSqRz3Mih",
     "quali_terminiert_sebastian": "stat_vKldwcyB9741E8NX3TA3qkRDJagRzFIOXLW3abkHW6v",
     "quali_terminiert_eren": "stat_jGwFvdSSBBZV2ljhIqht1ymA1lr0swoEKQJkUwMLTzW",
-    "no_show_qc": "stat_2TXvU9dFI9aRV1GDcbGfsBVR1bZiImfzip3EakHDBTV",
     "sc_terminiert": "stat_s1QLeMGJ9CjlCSF9J9jmhkBFqPySFhsIhYM35rhh9Tp",
 }
 
@@ -184,7 +183,7 @@ class DashboardData:
         
         # Daten pro User
         user_data = {}
-        team_success = {"qc_gefuehrt": 0, "no_shows": 0, "sc_terminiert": 0}
+        team_success = {"qc_gefuehrt": 0, "sc_terminiert": 0}
         
         for user_key, user_config in USERS.items():
             user_id = user_config["id"]
@@ -196,7 +195,6 @@ class DashboardData:
             kein_interesse = 0
             termine = 0
             qc_gefuehrt = 0
-            no_shows = 0
             sc_term = 0
             
             for activity in status_changes:
@@ -213,13 +211,10 @@ class DashboardData:
                     kein_interesse += 1
                 elif new_status == user_config["termin_status"]:
                     termine += 1
-                elif new_status == STATUS_CONFIG["no_show_qc"]:
-                    no_shows += 1
                 elif new_status == STATUS_CONFIG["sc_terminiert"]:
                     sc_term += 1
                 
                 # QC geführt = Status-Change VON "Quali terminiert" ZU etwas anderem
-                # (aber nicht zu einem anderen "Quali terminiert" Status)
                 if "quali terminiert" in old_label and "quali terminiert" not in new_label:
                     qc_gefuehrt += 1
             
@@ -248,13 +243,11 @@ class DashboardData:
                 "quotas": quotas,
                 # Erfolgsmetriken für separate Anzeige
                 "qc_gefuehrt": qc_gefuehrt,
-                "no_shows": no_shows,
                 "sc_terminiert": sc_term,
             }
             
             # Team Erfolgsmetriken aggregieren
             team_success["qc_gefuehrt"] += qc_gefuehrt
-            team_success["no_shows"] += no_shows
             team_success["sc_terminiert"] += sc_term
         
         # Team Gesamtwerte
@@ -338,7 +331,7 @@ def render_success_bubble(team_success: Dict):
     st.markdown("## 📊 ÜBERGEBORDNETE METRIKEN")
     st.caption("Erfolgskontrolle & Funnel-Endstufen")
     
-    cols = st.columns(3)
+    cols = st.columns(2)
     
     with cols[0]:
         render_big_metric(
@@ -349,22 +342,10 @@ def render_success_bubble(team_success: Dict):
     
     with cols[1]:
         render_big_metric(
-            "🏃 No Shows", 
-            str(team_success["no_shows"]),
-            color="warning"
-        )
-    
-    with cols[2]:
-        render_big_metric(
             "📞 SC Terminiert", 
             str(team_success["sc_terminiert"]),
             color="success"
         )
-    
-    # Zusatzinfo
-    if team_success["qc_gefuehrt"] > 0:
-        no_show_rate = round(team_success["no_shows"] / team_success["qc_gefuehrt"] * 100, 1)
-        st.info(f"📊 No-Show-Rate: {no_show_rate}% der geführten QCs sind nicht erschienen")
 
 
 def render_team_overview_clean(team_totals: Dict):
@@ -485,7 +466,6 @@ def main():
                 "Quote_Entscheider_Termin": data["quotas"]["entscheider_to_termin"],
                 "Anrufe_pro_Termin": round(data["calls"]["total_calls"] / data["termine"], 1) if data["termine"] else 0,
                 "QC_gefuehrt": data["qc_gefuehrt"],
-                "No_Shows": data["no_shows"],
                 "SC_terminiert": data["sc_terminiert"],
             })
         
