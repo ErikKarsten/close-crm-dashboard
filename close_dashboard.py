@@ -479,13 +479,9 @@ def main():
         if refresh:
             st.rerun()
     
-    # Header
-    st.markdown(f"""
-        <div style="background:linear-gradient(90deg,#1a1a2e 0%,#16213e 100%);padding:30px;border-radius:15px;margin-bottom:30px;">
-            <h1 style="color:white;margin:0;">🦞 Vertriebsreporting</h1>
-            <p style="color:#888;margin:10px 0 0 0;">{date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}</p>
-        </div>
-    """, unsafe_allow_html=True)
+    # Einfacher Titel ohne großen Header
+    st.title("🦞 Vertriebsreporting")
+    st.caption(f"{date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}")
     
     # Daten laden
     api = CloseAPI(st.session_state["api_key"])
