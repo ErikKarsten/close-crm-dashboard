@@ -11,6 +11,7 @@ import hashlib
 import json
 import urllib.request
 import urllib.parse
+from collections import defaultdict
 from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 import plotly.graph_objects as go
