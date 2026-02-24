@@ -218,6 +218,11 @@ class DashboardData:
             
             total_calls = call_metrics["total_calls"]
             
+            # Erscheinungsquote berechnen:
+            # Termine (Quali terminiert) - NoShows + SC terminiert + QC geführt
+            showups = termine - no_shows + sc_term
+            showup_rate = round(showups / termine * 100, 1) if termine > 0 else 0
+            
             user_data[user_key] = {
                 "name": user_config["name"],
                 "color": user_config["color"],
@@ -229,6 +234,8 @@ class DashboardData:
                 "qc_gefuehrt": qc_gefuehrt,
                 "no_shows": no_shows,
                 "sc_terminiert": sc_term,
+                "showups": showups,
+                "showup_rate": showup_rate,
                 # Quoten
                 "brutto_to_termin": round(termine / total_calls * 100, 1) if total_calls else 0,
                 "connection_rate": call_metrics["connection_rate"],
@@ -236,16 +243,23 @@ class DashboardData:
                 "cpt": round(total_calls / termine, 1) if termine else 0,
             }
         
+        # Team Erscheinungsquote
+        total_showups = sum(u["showups"] for u in user_data.values())
+        total_termine = sum(u["termine"] for u in user_data.values())
+        team_showup_rate = round(total_showups / total_termine * 100, 1) if total_termine > 0 else 0
+        
         team_totals = {
             "total_calls": sum(u["calls"]["total_calls"] for u in user_data.values()),
             "total_connected": sum(u["calls"]["connected_calls"] for u in user_data.values()),
-            "total_termine": sum(u["termine"] for u in user_data.values()),
+            "total_termine": total_termine,
             "total_talk_time": sum(u["calls"]["talk_time_min"] for u in user_data.values()),
             "total_sekr": sum(u["sekr_erreicht"] for u in user_data.values()),
             "total_kein_interesse": sum(u["kein_interesse"] for u in user_data.values()),
             "qc_gefuehrt": sum(u["qc_gefuehrt"] for u in user_data.values()),
             "no_shows": sum(u["no_shows"] for u in user_data.values()),
             "sc_terminiert": sum(u["sc_terminiert"] for u in user_data.values()),
+            "showups": total_showups,
+            "showup_rate": team_showup_rate,
         }
         
         return user_data, team_totals
@@ -308,10 +322,10 @@ def create_metrics_grid(team_totals: Dict):
                                f"{team_totals['total_connected']} verbunden", 
                                "#3498db"), unsafe_allow_html=True)
     with col3:
-        conn_rate = round(team_totals["total_connected"]/team_totals["total_calls"]*100,1) if team_totals["total_calls"] else 0
-        st.markdown(metric_card("📊 CONNECTION", f"{conn_rate}%", 
-                               "Verbindungsrate", 
-                               "#9b59b6"), unsafe_allow_html=True)
+        showup_color = "#27ae60" if team_totals['showup_rate'] >= 70 else ("#f39c12" if team_totals['showup_rate'] >= 50 else "#e74c3c")
+        st.markdown(metric_card("✅ ERSCHIENEN", f"{team_totals['showup_rate']}%", 
+                               f"{team_totals['showups']}/{team_totals['total_termine']} Termine", 
+                               showup_color), unsafe_allow_html=True)
     with col4:
         st.markdown(metric_card("⏱️ ZEIT", f"{team_totals['total_talk_time']}", 
                                "Gesamtminuten", 
@@ -388,9 +402,9 @@ def create_user_cards(user_data: Dict):
                 st.metric("🎯 Termine", data["termine"])
                 st.caption(f"☎️ {data['cpt']} Anrufe/Termin")
             with m4:
-                entsch_quote = data["entscheider_to_termin"]
-                st.metric("📈 Entscheider→Termin", f"{entsch_quote}%")
-                st.caption(f"👔 {data['sekr_erreicht']} VZ | 🎯 {data['entscheider_erreicht']} Entscheider")
+                showup_color = "#27ae60" if data['showup_rate'] >= 70 else ("#f39c12" if data['showup_rate'] >= 50 else "#e74c3c")
+                st.metric("✅ Erscheinungsquote", f"{data['showup_rate']}%")
+                st.caption(f"🎯 {data['showups']}/{data['termine']} Termine | {data['no_shows']} No-Shows")
             
             st.markdown("---")
 
