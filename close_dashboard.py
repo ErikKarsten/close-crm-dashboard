@@ -189,8 +189,8 @@ class DashboardData:
                 if "quali terminiert" in old_label:
                     qc_gefuehrt += 1
             
-            sekr_erreicht = max(0, call_metrics["connected_calls"] - kein_interesse)
-            entscheider_erreicht = max(0, call_metrics["connected_calls"] - sekr_erreicht)
+            # Berechnung: Entscheider = Verbunden - VZ - Kein Interesse
+            entscheider_erreicht = max(0, call_metrics["connected_calls"] - sekr_erreicht - kein_interesse)
             
             total_calls = call_metrics["total_calls"]
             
@@ -366,11 +366,7 @@ def create_user_cards(user_data: Dict):
             with m4:
                 entsch_quote = data["entscheider_to_termin"]
                 st.metric("📈 Entscheider→Termin", f"{entsch_quote}%")
-                st.caption(f"👔 {data['sekr_erreicht']} VZ erreicht")
-            
-            # Progress bars für Quoten
-            st.progress(min(data["brutto_to_termin"] / 10, 1.0), 
-                       text=f"Brutto→Termin: {data['brutto_to_termin']}%")
+                st.caption(f"👔 {data['sekr_erreicht']} VZ | 🎯 {data['entscheider_erreicht']} Entscheider")
             
             st.markdown("---")
 
