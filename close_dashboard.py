@@ -292,6 +292,52 @@ def create_metrics_grid(team_totals: Dict):
         st.markdown(metric_card("⏱️ ZEIT", f"{team_totals['total_talk_time']}", 
                                "Gesamtminuten", 
                                "#e67e22"), unsafe_allow_html=True)
+    
+    # ZIEL-PROGRESS (30 Termine pro Woche)
+    st.markdown("---")
+    GOAL = 30
+    current = team_totals["total_termine"]
+    percentage = min((current / GOAL) * 100, 100)
+    
+    col_goal1, col_goal2 = st.columns([3, 1])
+    with col_goal1:
+        st.markdown(f"#### 🎯 Wochenziel: {current} / {GOAL} Termine")
+        
+        # Farbe basierend auf Fortschritt
+        if percentage >= 100:
+            bar_color = "#27ae60"  # Grün - Ziel erreicht
+        elif percentage >= 70:
+            bar_color = "#f39c12"  # Orange - fast da
+        else:
+            bar_color = "#e74c3c"  # Rot - weit entfernt
+        
+        # Progress Bar HTML
+        st.markdown(f"""
+            <div style="background:#1a1a2e;border-radius:10px;padding:3px;margin:10px 0;">
+                <div style="background:{bar_color};width:{percentage}%;height:30px;border-radius:8px;
+                           display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;
+                           transition:width 0.5s ease;">
+                    {int(percentage)}%
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with col_goal2:
+        remaining = max(0, GOAL - current)
+        if remaining == 0:
+            st.success("✅ Ziel erreicht!")
+        else:
+            st.info(f"📝 Noch {remaining} Termine")
+        
+        # Motivations-Text
+        if percentage >= 100:
+            st.caption("🎉 Super! Ziel übertroffen!")
+        elif percentage >= 75:
+            st.caption("💪 Fast geschafft!")
+        elif percentage >= 50:
+            st.caption("🚀 Guter Fortschritt!")
+        else:
+            st.caption("⚡ Weiter so!")
 
 
 def create_user_cards(user_data: Dict):
