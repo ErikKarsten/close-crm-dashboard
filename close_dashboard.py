@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Close CRM Dashboard - Version 4.0
-Modernes, klares UI mit Visualisierungen
+Close CRM Dashboard - Version 4.1
+Mit Termin-Realisierungsquote
 Passwort: Getrichquick2025
 """
 
@@ -11,18 +11,13 @@ import hashlib
 import json
 import urllib.request
 import urllib.parse
-import time
-from datetime import datetime, timedelta, date
-from collections import defaultdict
+from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
-import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 st.set_page_config(page_title="Vertriebsreporting", page_icon="🦞", layout="wide")
 
 BASE_URL = "https://api.close.com/api/v1"
-
 ENCRYPTED_API_KEY = "api_6I9WrSp4OSDPqcHQdsEsAX.4xY7CcOf3xGrsLZi5TAOE4"
 CORRECT_PASSWORD_HASH = "088d2a3bb2d70f11bdb7c138875851e0369a04d23f7697501cbacfb1b6604391"
 
@@ -46,20 +41,17 @@ USERS = {
 
 
 def check_password(password: str) -> bool:
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
-    return password_hash == CORRECT_PASSWORD_HASH
+    return hashlib.sha256(password.encode()).hexdigest() == CORRECT_PASSWORD_HASH
 
 
 def login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("<div style='text-align:center;padding:60px 40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:20px;color:white;'>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center;padding:60px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:20px;color:white;'>", unsafe_allow_html=True)
         st.markdown("<h1>🦞 Vertriebsreporting</h1>", unsafe_allow_html=True)
         st.markdown("<h3>Vertriebler Dashboard</h3>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        
         password = st.text_input("Passwort", type="password", placeholder="••••••••")
-        
         if st.button("Anmelden", use_container_width=True):
             if check_password(password):
                 st.session_state["authenticated"] = True
@@ -67,13 +59,11 @@ def login_page():
                 st.rerun()
             else:
                 st.error("❌ Falsches Passwort")
-        
         st.markdown("</div>", unsafe_allow_html=True)
 
 
 class CloseAPI:
     def __init__(self, api_key: str):
-        self.api_key = api_key
         auth_str = base64.b64encode(f"{api_key}:".encode()).decode()
         self.auth_header = f"Basic {auth_str}"
 
@@ -87,28 +77,6 @@ class CloseAPI:
         req = urllib.request.Request(url, headers={"Authorization": _self.auth_header, "Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=30) as response:
             return json.loads(response.read().decode())
-
-    def get_leads_by_status(self, status_id: str) -> int:
-        """Zähle alle Leads mit einem bestimmten Status"""
-        count = 0
-        skip = 0
-        limit = 100
-        
-        while True:
-            params = {"status_id": status_id, "_limit": str(limit), "_skip": str(skip)}
-            try:
-                data = self._get_cached("lead/", tuple(sorted(params.items())))
-                batch = data.get("data", [])
-                count += len(batch)
-            except:
-                break
-            if len(batch) < limit:
-                break
-            skip += limit
-            if skip > 5000:  # Safety brake
-                break
-        
-        return count
 
     def get_all_activities(self, date_from: str, date_to: str, activity_type: Optional[str] = None) -> List[Dict]:
         activities = []
@@ -132,7 +100,7 @@ class CloseAPI:
             else:
                 activities.extend(batch)
             progress = min((skip + len(batch)) / 1000, 0.99)
-            progress_bar.progress(progress, text=f"Lade Daten... ({len(activities)} geladen)")
+            progress_bar.progress(progress, text=f"Lade... ({len(activities)} geladen)")
             if len(batch) < limit:
                 break
             skip += limit
@@ -191,14 +159,12 @@ class DashboardData:
             no_shows = 0
             sc_term = 0
             
-            # ALLE Activities dieses Users zählen (nicht nur Changes)
             user_activities = [a for a in status_changes if a.get("user_id") == user_id]
             
             for activity in user_activities:
                 new_status = activity.get("new_status_id")
                 old_label = activity.get("old_status_label", "").lower()
                 
-                # WICHTIG: Wir zählen alle Activities, wo der Status gesetzt wurde
                 if new_status == STATUS_CONFIG["sekr_erreicht"]:
                     sekr_erreicht += 1
                 elif new_status == STATUS_CONFIG["entscheider_kein_interesse"]:
@@ -213,8 +179,11 @@ class DashboardData:
                 if "quali terminiert" in old_label:
                     qc_gefuehrt += 1
             
-            # Berechnung Entscheider: Termine + Kein Interesse
             entscheider_erreicht = termine + kein_interesse
+            
+            # Termin-Realisierungsquote: Termine - NoShows + SC / Termine
+            termine_stattgefunden = termine - no_shows + sc_term
+            termin_realisierung = round(termine_stattgefunden / termine * 100, 1) if termine > 0 else 0
             
             total_calls = call_metrics["total_calls"]
             
@@ -229,7 +198,8 @@ class DashboardData:
                 "qc_gefuehrt": qc_gefuehrt,
                 "no_shows": no_shows,
                 "sc_terminiert": sc_term,
-                # Quoten
+                "termine_stattgefunden": termine_stattgefunden,
+                "termin_realisierung": termin_realisierung,
                 "brutto_to_termin": round(termine / total_calls * 100, 1) if total_calls else 0,
                 "connection_rate": call_metrics["connection_rate"],
                 "entscheider_to_termin": round(termine / entscheider_erreicht * 100, 1) if entscheider_erreicht else 0,
@@ -252,41 +222,24 @@ class DashboardData:
 
 
 def create_comparison_chart(user_data: Dict):
-    """Balkendiagramm für Anwahlen-Vergleich"""
-    names = [u["name"].split()[0] for u in user_data.values()]  # Nur Vornamen
+    names = [u["name"].split()[0] for u in user_data.values()]
     calls = [u["calls"]["total_calls"] for u in user_data.values()]
     colors = [u["color"] for u in user_data.values()]
     
     fig = go.Figure()
-    
     fig.add_trace(go.Bar(
-        x=names,
-        y=calls,
-        marker_color=colors,
-        text=calls,
-        textposition='outside',
+        x=names, y=calls, marker_color=colors, text=calls, textposition='outside',
         textfont=dict(size=16, color='white'),
-        hovertemplate='<b>%{x}</b><br>Anwahlen: %{y}<extra></extra>',
     ))
-    
     fig.update_layout(
-        title=dict(text='📞 Anwahlen pro Vertriebler', font=dict(size=20, color='white'), x=0.5),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white'),
-        xaxis=dict(title='', tickfont=dict(size=14)),
-        yaxis=dict(title='Anzahl', gridcolor='rgba(255,255,255,0.1)', tickfont=dict(size=12)),
-        showlegend=False,
-        height=350,
-        margin=dict(t=50, b=30, l=50, r=30),
+        title=dict(text='📞 Anwahlen pro Vertriebler', font=dict(size=20), x=0.5),
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white'), showlegend=False, height=350,
     )
-    
     return fig
 
 
 def create_metrics_grid(team_totals: Dict):
-    """Kompakte Metrik-Karten"""
-    
     def metric_card(title, value, subtitle="", color="#3498db"):
         return f"""
         <div style="background:linear-gradient(135deg,{color}22 0%,{color}11 100%);border:1px solid {color}44;
@@ -301,7 +254,7 @@ def create_metrics_grid(team_totals: Dict):
     
     with col1:
         st.markdown(metric_card("🎯 TERMINE", team_totals["total_termine"], 
-                               f"{round(team_totals['total_termine']/team_totals['total_calls']*100,1)}% Quote" if team_totals['total_calls'] else "", 
+                               f"{round(team_totals['total_termine']/team_totals['total_calls']*100,1)}%" if team_totals['total_calls'] else "", 
                                "#27ae60"), unsafe_allow_html=True)
     with col2:
         st.markdown(metric_card("📞 ANWAHLEN", team_totals["total_calls"], 
@@ -309,73 +262,23 @@ def create_metrics_grid(team_totals: Dict):
                                "#3498db"), unsafe_allow_html=True)
     with col3:
         conn_rate = round(team_totals["total_connected"]/team_totals["total_calls"]*100,1) if team_totals["total_calls"] else 0
-        st.markdown(metric_card("📊 CONNECTION", f"{conn_rate}%", 
-                               "Verbindungsrate", 
-                               "#9b59b6"), unsafe_allow_html=True)
+        st.markdown(metric_card("📊 CONNECTION", f"{conn_rate}%", "Verbindungsrate", "#9b59b6"), unsafe_allow_html=True)
     with col4:
-        st.markdown(metric_card("⏱️ ZEIT", f"{team_totals['total_talk_time']}", 
-                               "Gesamtminuten", 
-                               "#e67e22"), unsafe_allow_html=True)
-    
-    # ZIEL-PROGRESS (30 Termine pro Woche)
-    st.markdown("---")
-    GOAL = 30
-    current = team_totals["total_termine"]
-    percentage = min((current / GOAL) * 100, 100)
-    
-    col_goal1, col_goal2 = st.columns([3, 1])
-    with col_goal1:
-        st.markdown(f"#### 🎯 Wochenziel: {current} / {GOAL} Termine")
-        
-        # Farbe basierend auf Fortschritt
-        if percentage >= 100:
-            bar_color = "#27ae60"  # Grün - Ziel erreicht
-        elif percentage >= 70:
-            bar_color = "#f39c12"  # Orange - fast da
-        else:
-            bar_color = "#e74c3c"  # Rot - weit entfernt
-        
-        # Progress Bar HTML
-        st.markdown(f"""
-            <div style="background:#1a1a2e;border-radius:10px;padding:3px;margin:10px 0;">
-                <div style="background:{bar_color};width:{percentage}%;height:30px;border-radius:8px;
-                           display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;
-                           transition:width 0.5s ease;">
-                    {int(percentage)}%
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    with col_goal2:
-        remaining = max(0, GOAL - current)
-        if remaining == 0:
-            st.success("✅ Ziel erreicht!")
-        else:
-            st.info(f"📝 Noch {remaining} Termine")
-        
-        # Motivations-Text
-        if percentage >= 100:
-            st.caption("🎉 Super! Ziel übertroffen!")
-        elif percentage >= 75:
-            st.caption("💪 Fast geschafft!")
-        elif percentage >= 50:
-            st.caption("🚀 Guter Fortschritt!")
-        else:
-            st.caption("⚡ Weiter so!")
+        st.markdown(metric_card("⏱️ ZEIT", f"{team_totals['total_talk_time']}", "Gesamtminuten", "#e67e22"), unsafe_allow_html=True)
 
 
 def create_user_cards(user_data: Dict):
-    """Einzelne User-Karten"""
+    """Einzelne User-Karten mit Termin-Realisierungsquote"""
     for user_key, data in user_data.items():
         with st.container():
-            # Header mit Name und Farbe
+            # Header
             st.markdown(f"""
-                <div style="background:{data['color']}20;border-left:5px solid {data['color']};padding:15px 20px;margin:20px 0 10px 0;border-radius:0 10px 10px 0;">
+                <div style="background:{data['color']}20;border-left:5px solid {data['color']};padding:15px;margin:20px 0 10px;border-radius:0 10px 10px 0;">
                     <h2 style="color:{data['color']};margin:0;font-size:24px;">{data['name']}</h2>
                 </div>
             """, unsafe_allow_html=True)
             
-            # Metriken in 4 Spalten
+            # ERSTE ZEILE: 4 Standard-Metriken
             m1, m2, m3, m4 = st.columns(4)
             
             with m1:
@@ -391,6 +294,29 @@ def create_user_cards(user_data: Dict):
                 entsch_quote = data["entscheider_to_termin"]
                 st.metric("📈 Entscheider→Termin", f"{entsch_quote}%")
                 st.caption(f"👔 {data['sekr_erreicht']} VZ | 🎯 {data['entscheider_erreicht']} Entscheider")
+            
+            # ZWEITE ZEILE: Termin-Realisierungsquote als 5. Wert
+            st.markdown("---")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                # Termin-Realisierungsquote mit Farbcodierung
+                real_color = "#27ae60" if data['termin_realisierung'] >= 70 else ("#f39c12" if data['termin_realisierung'] >= 50 else "#e74c3c")
+                st.markdown(f"""
+                    <div style="background:{real_color}15;border:2px solid {real_color};border-radius:10px;padding:15px;text-align:center;">
+                        <div style="font-size:12px;color:#888;">✅ TERMIN-REALISIERUNG</div>
+                        <div style="font-size:32px;font-weight:bold;color:{real_color};">{data['termin_realisierung']}%</div>
+                        <div style="font-size:11px;color:#666;">{data['termine_stattgefunden']}/{data['termine']} Termine stattgefunden</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.metric("📋 QC geführt", data["qc_gefuehrt"])
+                st.caption(f"🏃 {data['no_shows']} No-Shows")
+            
+            with col3:
+                st.metric("📞 SC terminiert", data["sc_terminiert"])
+                st.caption(f"❌ {data['kein_interesse']} Kein Interesse")
             
             st.markdown("---")
 
@@ -429,57 +355,9 @@ def main():
         preset = st.selectbox("Zeitraum", ["Heute", "Gestern", "Diese Woche", "Letzte Woche", "Dieser Monat", "Letzter Monat"], index=1)
         date_from, date_to = get_date_range_from_preset(preset)
         st.info(f"📅 {date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}")
-        
-        # JavaScript Countdown für sichtbaren Timer
-        st.markdown("""
-            <script>
-            (function() {
-                // Countdown für 5 Minuten (300 Sekunden)
-                let timeLeft = 300;
-                const countdownEl = document.createElement('div');
-                countdownEl.id = 'refresh-countdown';
-                countdownEl.style.cssText = 'background:#2c3e50;padding:10px 15px;border-radius:8px;margin-top:10px;text-align:center;font-family:monospace;font-size:14px;';
-                
-                function updateCountdown() {
-                    const minutes = Math.floor(timeLeft / 60);
-                    const seconds = timeLeft % 60;
-                    const color = timeLeft < 60 ? '#e74c3c' : (timeLeft < 120 ? '#f39c12' : '#27ae60');
-                    countdownEl.innerHTML = `
-                        <div style="color:#888;font-size:11px;margin-bottom:5px;">🔄 Auto-Refresh in</div>
-                        <div style="color:${color};font-size:20px;font-weight:bold;">
-                            ${minutes}:${seconds.toString().padStart(2, '0')}
-                        </div>
-                    `;
-                    
-                    if (timeLeft <= 0) {
-                        window.location.reload();
-                    } else {
-                        timeLeft--;
-                    }
-                }
-                
-                // Container im Sidebar finden (erstes div mit st-emotion-cache)
-                const sidebar = document.querySelector('[data-testid="stSidebar"]');
-                if (sidebar) {
-                    const container = sidebar.querySelector('.element-container:last-child');
-                    if (container) {
-                        container.appendChild(countdownEl);
-                        updateCountdown();
-                        setInterval(updateCountdown, 1000);
-                    }
-                }
-            })();
-            </script>
-            <div id="countdown-fallback" style="background:#2c3e50;padding:10px;border-radius:8px;margin-top:10px;text-align:center;">
-                <div style="color:#888;font-size:11px;">🔄 Auto-Refresh alle 5 Minuten</div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        refresh = st.button("🔄 Jetzt Aktualisieren", use_container_width=True)
-        if refresh:
-            st.rerun()
+        refresh = st.button("🔄 Aktualisieren", use_container_width=True)
     
-    # Einfacher Titel ohne großen Header
+    # Header
     st.title("🦞 Vertriebsreporting")
     st.caption(f"{date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}")
     
@@ -506,24 +384,6 @@ def main():
     # EINZELNE VERTRIEBLER
     st.markdown("## 👤 Einzelergebnisse")
     create_user_cards(user_data)
-    
-    # ZUSAMMENFASSUNG
-    st.markdown("## 📝 Zusammenfassung")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**✅ Erfolge**")
-        st.markdown(f"- **{team_totals['total_termine']}** Termine insgesamt")
-        st.markdown(f"- **{team_totals['sc_terminiert']}** SC terminiert")
-        st.markdown(f"- **{team_totals['qc_gefuehrt']}** QC geführt")
-    
-    with col2:
-        st.markdown("**⚠️ Herausforderungen**")
-        showup = round((team_totals['total_termine'] - team_totals['no_shows']) / team_totals['total_termine'] * 100, 1) if team_totals['total_termine'] else 0
-        st.markdown(f"- **{team_totals['no_shows']}** No Shows ({showup}% Show-up)")
-        st.markdown(f"- **{team_totals['total_kein_interesse']}** Kein Interesse")
-        st.markdown(f"- **{team_totals['total_sekr']}** VZ erreicht")
 
 
 if __name__ == "__main__":
