@@ -11,6 +11,7 @@ import hashlib
 import json
 import urllib.request
 import urllib.parse
+import time
 from datetime import datetime, timedelta, date
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
@@ -352,6 +353,15 @@ def main():
         login_page()
         return
     
+    # Auto-Refresh alle 5 Minuten (300 Sekunden)
+    if "last_refresh" not in st.session_state:
+        st.session_state["last_refresh"] = time.time()
+    
+    current_time = time.time()
+    if current_time - st.session_state["last_refresh"] > 300:  # 5 Minuten
+        st.session_state["last_refresh"] = current_time
+        st.rerun()
+    
     # Sidebar
     with st.sidebar:
         if st.button("🔒 Abmelden"):
@@ -362,7 +372,14 @@ def main():
         preset = st.selectbox("Zeitraum", ["Heute", "Gestern", "Diese Woche", "Letzte Woche", "Dieser Monat", "Letzter Monat"], index=1)
         date_from, date_to = get_date_range_from_preset(preset)
         st.info(f"📅 {date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}")
+        
+        # Auto-Refresh Status
+        next_refresh = 300 - (current_time - st.session_state["last_refresh"])
+        st.caption(f"🔄 Auto-Refresh in {int(next_refresh/60)}:{int(next_refresh%60):02d} min")
+        
         refresh = st.button("🔄 Aktualisieren", use_container_width=True)
+        if refresh:
+            st.session_state["last_refresh"] = current_time
     
     # Header
     st.markdown(f"""
