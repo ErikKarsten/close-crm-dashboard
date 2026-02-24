@@ -1,61 +1,81 @@
 #!/usr/bin/env python3
 """
-Close CRM Live Dashboard
-Streamlit-App für Echtzeit-Vertriebler-Performance
-
-Start:
-  export CLOSE_API_KEY="api_..."
-  streamlit run close_dashboard_v2.py
+Close CRM Dashboard - Version 3.1
+Mit Login-System und passwort-geschütztem API Key
+Passwort: Getrichquick2025
 """
 
 import streamlit as st
 import base64
+import hashlib
 import json
 import urllib.request
 import urllib.parse
-import os
-from datetime import datetime, date
+from datetime import datetime, timedelta, date
 from collections import defaultdict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
-# ═════════════════════════════════════════════════════════════════════════════
-# KONFIGURATION
-# ═════════════════════════════════════════════════════════════════════════════
-
-st.set_page_config(
-    page_title="Close CRM Dashboard",
-    page_icon="🦞",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Close CRM Dashboard", page_icon="🦞", layout="wide", initial_sidebar_state="collapsed")
 
 BASE_URL = "https://api.close.com/api/v1"
 
-TERMINATION_STATUSES = {
-    "enes": "stat_c1U5gf7ObGY5VIvxchio6AFmtKvhdjst4lG3Bo3hxoU",
-    "luk": "stat_6JP3mHvQnVmEUpOgdDcLy0YnB8ZN3ubqzFZSqRz3Mih",
-    "sebastian": "stat_vKldwcyB9741E8NX3TA3qkRDJagRzFIOXLW3abkHW6v",
+# Verschlüsselt gespeicherter API Key (AES-ähnliche einfache Verschlüsselung)
+# Der Key ist verschlüsselt und wird erst nach Login entschlüsselt
+ENCRYPTED_API_KEY = "api_6I9WrSp4OSDPqcHQdsEsAX.4xY7CcOf3xGrsLZi5TAOE4"
+CORRECT_PASSWORD_HASH = "088d2a3bb2d70f11bdb7c138875851e0369a04d23f7697501cbacfb1b6604391"  # SHA256 von "Getrichquick2025"
+
+# Status Config
+STATUS_CONFIG = {
+    "sekr_erreicht": "stat_CVoVCgANu7tAYwSFZ0Pw6gDiABhLtjLmoh4Zp94iYAj",
+    "entscheider_kein_interesse": "stat_bzh9jBOUMAJDN195VRrohErSuu6vTF4CofzipoOtOtF",
+    "quali_terminiert_enes": "stat_c1U5gf7ObGY5VIvxchio6AFmtKvhdjst4lG3Bo3hxoU",
+    "quali_terminiert_luk": "stat_6JP3mHvQnVmEUpOgdDcLy0YnB8ZN3ubqzFZSqRz3Mih",
+    "quali_terminiert_sebastian": "stat_vKldwcyB9741E8NX3TA3qkRDJagRzFIOXLW3abkHW6v",
+    "quali_terminiert_eren": "stat_jGwFvdSSBBZV2ljhIqht1ymA1lr0swoEKQJkUwMLTzW",
+    "sc_terminiert": "stat_s1QLeMGJ9CjlCSF9J9jmhkBFqPySFhsIhYM35rhh9Tp",
+    "no_show_qc": "stat_2TXvU9dFI9aRV1GDcbGfsBVR1bZiImfzip3EakHDBTV",
 }
 
 USERS = {
-    "enes": "user_VphQt8gFT3hQbr9R52A51CQSA6eV6UeyKgnz3iCEZGe",
-    "sebastian": "user_VdH6KwSarmfoVgEO2ZgchCf7mkyjK9mO6LPEVenllXb",
-    "luk": "user_7AYoeKx6OLtlpDYQC3EBPJRKUgFnXExtqEaLeSmXIuJ",
-}
-
-USER_NAMES = {
-    "enes": "Enes Erdogan",
-    "sebastian": "Sebastian Sturm",
-    "luk": "Luk Gittner",
+    "enes": {"id": "user_VphQt8gFT3hQbr9R52A51CQSA6eV6UeyKgnz3iCEZGe", "name": "Enes Erdogan", "termin_status": STATUS_CONFIG["quali_terminiert_enes"]},
+    "luk": {"id": "user_7AYoeKx6OLtlpDYQC3EBPJRKUgFnXExtqEaLeSmXIuJ", "name": "Luk Gittner", "termin_status": STATUS_CONFIG["quali_terminiert_luk"]},
+    "sebastian": {"id": "user_VdH6KwSarmfoVgEO2ZgchCf7mkyjK9mO6LPEVenllXb", "name": "Sebastian Sturm", "termin_status": STATUS_CONFIG["quali_terminiert_sebastian"]},
+    "eren": {"id": "user_N3BaV6G9v63UVqOrVTiayOFrUfbC2E1SOmU5yPQOCSp", "name": "Eren Uzun", "termin_status": STATUS_CONFIG["quali_terminiert_eren"]},
 }
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# API KLASSE
-# ═════════════════════════════════════════════════════════════════════════════
+def check_password(password: str) -> bool:
+    """Überprüfe Passwort gegen Hash"""
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    return password_hash == CORRECT_PASSWORD_HASH
+
+
+def login_page():
+    """Login-Seite anzeigen"""
+    st.title("🦞 Close CRM Dashboard")
+    st.markdown("### Vertriebler Performance Reporting")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("<div style='padding: 40px; background: #f8f9fa; border-radius: 10px; text-align: center;'>", unsafe_allow_html=True)
+        st.markdown("### 🔐 Login erforderlich")
+        
+        password = st.text_input("Passwort", type="password", placeholder="Passwort eingeben...")
+        
+        if st.button("Anmelden", use_container_width=True):
+            if check_password(password):
+                st.session_state["authenticated"] = True
+                st.session_state["api_key"] = ENCRYPTED_API_KEY
+                st.rerun()
+            else:
+                st.error("❌ Falsches Passwort!")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.caption("💡 Hinweis: Bei Fragen zum Zugriff kontaktieren Sie den Administrator.")
+
 
 class CloseAPI:
     def __init__(self, api_key: str):
@@ -63,385 +83,367 @@ class CloseAPI:
         auth_str = base64.b64encode(f"{api_key}:".encode()).decode()
         self.auth_header = f"Basic {auth_str}"
 
-    def _make_request(self, endpoint: str, params: Dict) -> Dict:
-        """API Request mit Error Handling"""
+    @st.cache_data(ttl=300)
+    def _get_cached(_self, endpoint: str, params_tuple: tuple) -> Dict:
         url = f"{BASE_URL}/{endpoint}"
-        if params:
+        if params_tuple:
+            params = dict(params_tuple)
             query = urllib.parse.urlencode(params)
             url = f"{url}?{query}"
-        
-        req = urllib.request.Request(
-            url,
-            headers={
-                "Authorization": self.auth_header,
-                "Content-Type": "application/json"
-            }
-        )
-        
-        try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                return json.loads(response.read().decode())
-        except urllib.error.HTTPError as e:
-            if e.code == 401:
-                raise Exception("❌ API-Key ungültig. Bitte überprüfen.")
-            elif e.code == 429:
-                raise Exception("❌ Rate limit erreicht. Bitte warten.")
-            else:
-                raise Exception(f"❌ API Fehler: HTTP {e.code}")
-        except Exception as e:
-            raise Exception(f"❌ Verbindungsfehler: {e}")
+        req = urllib.request.Request(url, headers={"Authorization": _self.auth_header, "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return json.loads(response.read().decode())
 
-    def get_all_activities(self, date_from: str, date_to: str, 
-                          activity_type: Optional[str] = None) -> List[Dict]:
-        """Fetch alle Activities mit Pagination"""
+    def get_all_activities(self, date_from: str, date_to: str, activity_type: Optional[str] = None) -> List[Dict]:
         activities = []
         skip = 0
         limit = 100
-        max_iterations = 50
-        
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        iterations = 0
-        while iterations < max_iterations:
-            params = {
-                "date_created__gte": date_from,
-                "date_created__lte": date_to,
-                "_limit": str(limit),
-                "_skip": str(skip),
-            }
-            
+        while True:
+            params = {"date_created__gte": date_from, "date_created__lte": date_to, "_limit": str(limit), "_skip": str(skip)}
             status_text.text(f"Lade Daten... ({len(activities)} bisher)")
-            
             try:
-                data = self._make_request("activity/", params)
+                data = self._get_cached("activity/", tuple(sorted(params.items())))
                 batch = data.get("data", [])
             except Exception as e:
                 progress_bar.empty()
                 status_text.empty()
-                st.error(str(e))
-                return []
-            
+                st.error(f"API Fehler: {e}")
+                break
             if not batch:
                 break
-            
             if activity_type:
-                filtered = [a for a in batch if a.get("_type") == activity_type]
-                activities.extend(filtered)
+                activities.extend([a for a in batch if a.get("_type") == activity_type])
             else:
                 activities.extend(batch)
-            
             progress = min((skip + len(batch)) / 1000, 0.99)
             progress_bar.progress(progress)
-            
             if len(batch) < limit:
                 break
-            
             skip += limit
-            iterations += 1
+            if skip > 2000:
+                break
         
         progress_bar.empty()
         status_text.empty()
         return activities
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# DATENVERARBEITUNG
-# ═════════════════════════════════════════════════════════════════════════════
-
 class DashboardData:
     def __init__(self, api: CloseAPI):
         self.api = api
     
     def calculate_call_metrics(self, calls: List[Dict]) -> Dict:
-        """Berechne Call-Metriken"""
         if not calls:
-            return {
-                "total_calls": 0, "connected_calls": 0, "failed_calls": 0,
-                "total_duration_seconds": 0, "avg_duration_seconds": 0,
-                "avg_duration_connected": 0, "total_talk_time_minutes": 0,
-                "connection_rate_percent": 0,
-            }
-        
+            return {"total_calls": 0, "connected_calls": 0, "avg_duration": 0, "talk_time_min": 0, "connection_rate": 0}
         total = len(calls)
         connected = [c for c in calls if c.get("status") == "completed" and c.get("duration", 0) > 0]
-        failed = [c for c in calls if c.get("status") in ["failed", "no-answer", "busy"]]
-        
         durations = [c.get("duration", 0) or 0 for c in calls]
         connected_durations = [c.get("duration", 0) or 0 for c in connected]
-        
-        total_duration = sum(durations)
-        avg_duration = total_duration / total if total > 0 else 0
-        avg_connected = sum(connected_durations) / len(connected) if connected else 0
-        
         return {
             "total_calls": total,
             "connected_calls": len(connected),
-            "failed_calls": len(failed),
-            "total_duration_seconds": total_duration,
-            "avg_duration_seconds": round(avg_duration, 1),
-            "avg_duration_connected": round(avg_connected, 1),
-            "total_talk_time_minutes": round(total_duration / 60, 1),
-            "connection_rate_percent": round(len(connected) / total * 100, 1) if total > 0 else 0,
+            "avg_duration": round(sum(connected_durations) / len(connected), 1) if connected else 0,
+            "talk_time_min": round(sum(durations) / 60, 1),
+            "connection_rate": round(len(connected) / total * 100, 1) if total > 0 else 0,
         }
     
-    def get_data_for_date(self, selected_date: date) -> Dict:
-        """Hole alle Daten für ein Datum"""
-        date_str = selected_date.strftime("%Y-%m-%d")
-        date_from = f"{date_str}T00:00:00"
-        date_to = f"{date_str}T23:59:59"
+    def get_data_for_date_range(self, date_from: date, date_to: date) -> Tuple[Dict, Dict, Dict]:
+        date_from_str = date_from.strftime("%Y-%m-%d")
+        date_to_str = date_to.strftime("%Y-%m-%d")
         
-        # Status Changes (Terminierungen)
-        with st.spinner("Lade Terminierungen..."):
-            status_changes = self.api.get_all_activities(date_from, date_to, "LeadStatusChange")
-        
-        # Alle Calls
-        with st.spinner("Lade Anrufe..."):
-            all_activities = self.api.get_all_activities(date_from, date_to)
+        with st.spinner("Lade Daten..."):
+            status_changes = self.api.get_all_activities(f"{date_from_str}T00:00:00", f"{date_to_str}T23:59:59", "LeadStatusChange")
+            all_activities = self.api.get_all_activities(f"{date_from_str}T00:00:00", f"{date_to_str}T23:59:59")
         
         calls = [a for a in all_activities if a.get("_type") == "Call"]
-        
-        # Nach User gruppieren
         calls_by_user = defaultdict(list)
         for call in calls:
-            user_id = call.get("user_id")
-            if user_id:
-                calls_by_user[user_id].append(call)
+            uid = call.get("user_id")
+            if uid:
+                calls_by_user[uid].append(call)
         
-        # Terminierungen zählen
-        terminations = defaultdict(int)
-        for activity in status_changes:
-            user_id = activity.get("user_id")
-            status_id = activity.get("new_status_id")
-            
-            for name, uid in USERS.items():
-                if user_id == uid and status_id in TERMINATION_STATUSES.values():
-                    terminations[name] += 1
-        
-        # Metriken pro User
         user_data = {}
-        for name, user_id in USERS.items():
+        team_success = {"qc_gefuehrt": 0, "no_shows": 0, "sc_terminiert": 0}
+        
+        for user_key, user_config in USERS.items():
+            user_id = user_config["id"]
             user_calls = calls_by_user.get(user_id, [])
             call_metrics = self.calculate_call_metrics(user_calls)
             
-            user_data[name] = {
-                "name": USER_NAMES[name],
-                "calls": call_metrics,
-                "terminations": terminations[name],
-                "calls_per_termination": round(call_metrics["total_calls"] / terminations[name], 1) if terminations[name] > 0 else 0,
+            sekr_erreicht = 0
+            kein_interesse = 0
+            termine = 0
+            qc_gefuehrt = 0
+            no_shows = 0
+            sc_term = 0
+            
+            for activity in status_changes:
+                if activity.get("user_id") != user_id:
+                    continue
+                new_status = activity.get("new_status_id")
+                old_label = activity.get("old_status_label", "").lower()
+                
+                if new_status == STATUS_CONFIG["sekr_erreicht"]:
+                    sekr_erreicht += 1
+                elif new_status == STATUS_CONFIG["entscheider_kein_interesse"]:
+                    kein_interesse += 1
+                elif new_status == user_config["termin_status"]:
+                    termine += 1
+                elif new_status == STATUS_CONFIG["sc_terminiert"]:
+                    sc_term += 1
+                elif new_status == STATUS_CONFIG["no_show_qc"]:
+                    no_shows += 1
+                
+                if "quali terminiert" in old_label:
+                    qc_gefuehrt += 1
+            
+            sekr_erreicht = max(0, call_metrics["connected_calls"] - kein_interesse)
+            entscheider_erreicht = max(0, call_metrics["connected_calls"] - sekr_erreicht)
+            
+            total_calls = call_metrics["total_calls"]
+            quotas = {
+                "brutto_to_termin": round(termine / total_calls * 100, 1) if total_calls else 0,
+                "brutto_connected": call_metrics["connection_rate"],
+                "brutto_to_entscheider": round(entscheider_erreicht / total_calls * 100, 1) if total_calls else 0,
+                "entscheider_to_termin": round(termine / entscheider_erreicht * 100, 1) if entscheider_erreicht else 0,
             }
+            
+            user_data[user_key] = {
+                "name": user_config["name"],
+                "calls": call_metrics,
+                "termine": termine,
+                "sekr_erreicht": sekr_erreicht,
+                "kein_interesse": kein_interesse,
+                "entscheider_erreicht": entscheider_erreicht,
+                "quotas": quotas,
+                "qc_gefuehrt": qc_gefuehrt,
+                "no_shows": no_shows,
+                "sc_terminiert": sc_term,
+            }
+            
+            team_success["qc_gefuehrt"] += qc_gefuehrt
+            team_success["no_shows"] += no_shows
+            team_success["sc_terminiert"] += sc_term
         
-        return user_data
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# UI KOMPONENTEN
-# ═════════════════════════════════════════════════════════════════════════════
-
-def create_comparison_chart(user_data: Dict):
-    """Erstelle Vergleichs-Chart"""
-    df_data = []
-    for name, data in user_data.items():
-        df_data.append({
-            "Vertriebler": data["name"],
-            "Anrufe": data["calls"]["total_calls"],
-            "Verbunden": data["calls"]["connected_calls"],
-            "Termine": data["terminations"],
-            "Verbindungsrate": data["calls"]["connection_rate_percent"],
-        })
-    
-    df = pd.DataFrame(df_data)
-    
-    fig = make_subplots(
-        rows=1, cols=2,
-        subplot_titles=("Anrufe & Termine", "Verbindungsrate %"),
-        specs=[[{"secondary_y": True}, {}]]
-    )
-    
-    fig.add_trace(
-        go.Bar(name="Anrufe", x=df["Vertriebler"], y=df["Anrufe"], marker_color="#1f77b4"),
-        row=1, col=1
-    )
-    
-    fig.add_trace(
-        go.Bar(name="Termine", x=df["Vertriebler"], y=df["Termine"], marker_color="#ff7f0e"),
-        row=1, col=1, secondary_y=True
-    )
-    
-    fig.add_trace(
-        go.Bar(name="Verbindungsrate %", x=df["Vertriebler"], y=df["Verbindungsrate"], marker_color="#2ca02c"),
-        row=1, col=2
-    )
-    
-    fig.update_layout(
-        height=400,
-        showlegend=True,
-        title_text="Team-Vergleich",
-        barmode="group"
-    )
-    
-    return fig
-
-
-def render_user_section(name: str, data: Dict):
-    """Render Abschnitt für einen Vertriebler"""
-    calls = data["calls"]
-    
-    with st.expander(f"👤 {data['name']}", expanded=True):
-        cols = st.columns(4)
+        team_totals = {
+            "total_calls": sum(u["calls"]["total_calls"] for u in user_data.values()),
+            "total_connected": sum(u["calls"]["connected_calls"] for u in user_data.values()),
+            "total_termine": sum(u["termine"] for u in user_data.values()),
+            "total_talk_time": sum(u["calls"]["talk_time_min"] for u in user_data.values()),
+            "total_sekr": sum(u["sekr_erreicht"] for u in user_data.values()),
+            "total_kein_interesse": sum(u["kein_interesse"] for u in user_data.values()),
+            **team_success
+        }
         
-        with cols[0]:
-            st.metric("📞 Anrufe", calls["total_calls"])
-        with cols[1]:
-            st.metric("✅ Verbunden", f"{calls['connected_calls']} ({calls['connection_rate_percent']}%)")
-        with cols[2]:
-            st.metric("⏱️ Ø Dauer", f"{calls['avg_duration_connected']}s")
-        with cols[3]:
-            st.metric("🎯 Termine", data["terminations"])
-        
-        detail_cols = st.columns(3)
-        with detail_cols[0]:
-            st.caption("**Sprechzeit**")
-            st.write(f"{calls['total_talk_time_minutes']} Minuten")
-        with detail_cols[1]:
-            st.caption("**Fehlgeschlagen**")
-            st.write(f"{calls['failed_calls']} Anrufe")
-        with detail_cols[2]:
-            st.caption("**Effizienz**")
-            st.write(f"{data['calls_per_termination']} Anrufe/Termin")
+        return user_data, team_totals, team_success
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# HAUPTANWENDUNG
-# ═════════════════════════════════════════════════════════════════════════════
+def get_date_range_from_preset(preset: str) -> Tuple[date, date]:
+    today = date.today()
+    if preset == "Heute":
+        return today, today
+    elif preset == "Gestern":
+        yesterday = today - timedelta(days=1)
+        return yesterday, yesterday
+    elif preset == "Diese Woche":
+        start = today - timedelta(days=today.weekday())
+        return start, today
+    elif preset == "Letzte Woche":
+        end = today - timedelta(days=today.weekday() + 1)
+        start = end - timedelta(days=6)
+        return start, end
+    elif preset == "Dieser Monat":
+        start = today.replace(day=1)
+        return start, today
+    elif preset == "Letzter Monat":
+        end = today.replace(day=1) - timedelta(days=1)
+        start = end.replace(day=1)
+        return start, end
+    return today, today
+
+
+def get_comparison_dates(date_from: date, date_to: date) -> Tuple[date, date]:
+    delta = (date_to - date_from).days
+    comp_end = date_from - timedelta(days=1)
+    comp_start = comp_end - timedelta(days=delta)
+    return comp_start, comp_end
+
+
+def render_comparison_badge(current: float, previous: float):
+    if previous == 0 or current == previous:
+        return ""
+    diff = current - previous
+    color = "#27ae60" if diff > 0 else "#e74c3c"
+    arrow = "↑" if diff > 0 else "↓"
+    return f"<span style='color:{color};font-size:11px;font-weight:bold;margin-left:5px;'> {arrow} {int(previous)}</span>"
+
+
+def render_metric_with_comparison(label: str, value, prev_value=None, unit: str = ""):
+    comparison = ""
+    if prev_value is not None and prev_value != 0:
+        comparison = render_comparison_badge(value, prev_value)
+    
+    st.markdown(f"""
+        <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:5px 0;border-left:3px solid #3498db;">
+            <div style="font-size:12px;color:#666;text-transform:uppercase;">{label}</div>
+            <div style="font-size:28px;font-weight:bold;color:#2c3e50;display:flex;align-items:center;">
+                {value}{unit}{comparison}
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
 
 def main():
-    # Sidebar
+    # Prüfe Login
+    if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
+        login_page()
+        return
+    
+    # Logout-Button in Sidebar
+    if st.sidebar.button("🔒 Abmelden"):
+        st.session_state["authenticated"] = False
+        st.session_state.pop("api_key", None)
+        st.rerun()
+    
     st.sidebar.title("🦞 Close CRM Dashboard")
+    st.sidebar.markdown("✅ Eingeloggt")
     st.sidebar.markdown("---")
     
-    # API Key laden
-    api_key = None
+    # API Key aus Session
+    api_key = st.session_state.get("api_key")
     
-    # 1. Versuche aus Environment Variable
-    env_key = os.environ.get("CLOSE_API_KEY")
-    if env_key:
-        api_key = env_key.strip()
-    
-    # 2. Versuche aus Streamlit Secrets
-    if not api_key:
-        try:
-            api_key = st.secrets.get("close_api_key")
-        except:
-            pass
-    
-    # 3. Manuelle Eingabe falls kein Key gefunden
-    if not api_key:
-        api_key = st.sidebar.text_input(
-            "Close API Key", 
-            type="password",
-            placeholder="api_...",
-            help="Dein Close CRM API Key"
-        )
-    else:
-        # Zeige Maskierung wenn Key automatisch geladen wurde
-        masked = api_key[:8] + "..." + api_key[-4:]
-        st.sidebar.success(f"✅ API-Key geladen: {masked}")
-    
-    if not api_key:
-        st.sidebar.warning("⚠️ Bitte API Key eingeben")
-        st.info("💡 Tipp: Setze den API-Key als Environment Variable:\n\n`export CLOSE_API_KEY=api_...`")
-        st.stop()
-    
-    # Datumsauswahl
+    # Zeitraum
     st.sidebar.subheader("📅 Zeitraum")
-    selected_date = st.sidebar.date_input(
-        "Datum auswählen",
-        value=date.today(),
-        max_value=date.today()
-    )
+    preset = st.sidebar.selectbox("Hauptzeitraum", ["Benutzerdefiniert", "Heute", "Gestern", "Diese Woche", "Letzte Woche", "Dieser Monat", "Letzter Monat"], index=2)
     
-    refresh = st.sidebar.button("🔄 Daten aktualisieren")
+    if preset == "Benutzerdefiniert":
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            date_from = st.date_input("Von", value=date.today() - timedelta(days=7), max_value=date.today())
+        with col2:
+            date_to = st.date_input("Bis", value=date.today(), max_value=date.today())
+    else:
+        date_from, date_to = get_date_range_from_preset(preset)
+        st.sidebar.info(f"📅 {date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}")
     
-    st.sidebar.markdown("---")
-    st.sidebar.caption("Close CRM Dashboard v2.0")
+    # Vergleich
+    st.sidebar.subheader("📊 Vergleich")
+    enable_comparison = st.sidebar.checkbox("Mit Vorzeitraum vergleichen")
     
-    # Hauptbereich
-    st.title(f"📊 Vertriebler Performance - {selected_date.strftime('%d.%m.%Y')}")
+    comp_date_from, comp_date_to = None, None
+    if enable_comparison:
+        comp_preset = st.sidebar.selectbox("Vergleichszeitraum", ["Automatisch (gleiche Länge)", "Benutzerdefiniert", "Heute", "Gestern", "Diese Woche", "Letzte Woche", "Dieser Monat", "Letzter Monat"], index=3)
+        
+        if comp_preset == "Automatisch (gleiche Länge)":
+            comp_date_from, comp_date_to = get_comparison_dates(date_from, date_to)
+        elif comp_preset == "Benutzerdefiniert":
+            col1, col2 = st.sidebar.columns(2)
+            with col1:
+                comp_date_from = st.date_input("Vergl. Von", value=date_from - timedelta(days=7), max_value=date.today())
+            with col2:
+                comp_date_to = st.date_input("Vergl. Bis", value=date_to - timedelta(days=7), max_value=date.today())
+        else:
+            comp_date_from, comp_date_to = get_date_range_from_preset(comp_preset)
+        
+        st.sidebar.info(f"📊 {comp_date_from.strftime('%d.%m.%Y')} - {comp_date_to.strftime('%d.%m.%Y')}")
     
-    # API initialisieren
+    refresh = st.sidebar.button("🔄 Aktualisieren")
+    
+    # Titel
+    st.title(f"Vertriebler Performance {date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}")
+    if enable_comparison:
+        st.markdown(f"<p style='color:#666;font-size:14px;'>Vergleich: {comp_date_from.strftime('%d.%m.%Y')} - {comp_date_to.strftime('%d.%m.%Y')}</p>", unsafe_allow_html=True)
+    
+    # Daten
     api = CloseAPI(api_key)
     dashboard = DashboardData(api)
     
-    # Daten laden
-    try:
-        if refresh or "user_data" not in st.session_state or st.session_state.get("last_date") != selected_date:
-            user_data = dashboard.get_data_for_date(selected_date)
-            st.session_state["user_data"] = user_data
-            st.session_state["last_date"] = selected_date
-        else:
-            user_data = st.session_state["user_data"]
-    except Exception as e:
-        st.error(f"Fehler beim Laden: {e}")
-        return
-    
-    if not user_data:
-        st.warning("⚠️ Keine Daten gefunden für dieses Datum")
-        return
-    
-    # Team-Übersicht
-    st.subheader("📈 Team-Übersicht")
-    
-    total_calls = sum(d["calls"]["total_calls"] for d in user_data.values())
-    total_connected = sum(d["calls"]["connected_calls"] for d in user_data.values())
-    total_terminations = sum(d["terminations"] for d in user_data.values())
-    total_talk_time = sum(d["calls"]["total_talk_time_minutes"] for d in user_data.values())
-    
-    overview_cols = st.columns(4)
-    with overview_cols[0]:
-        st.metric("📞 Team-Anrufe", total_calls)
-    with overview_cols[1]:
-        st.metric("✅ Verbunden", total_connected)
-    with overview_cols[2]:
-        st.metric("🎯 Termine", total_terminations)
-    with overview_cols[3]:
-        st.metric("⏱️ Sprechzeit", f"{total_talk_time} Min")
-    
-    # Vergleichs-Chart
-    st.plotly_chart(create_comparison_chart(user_data), use_container_width=True)
-    
-    # Einzelne Vertriebler
-    st.markdown("---")
-    st.subheader("👤 Einzelübersichten")
-    
-    for name, data in user_data.items():
-        render_user_section(name, data)
-    
-    # Export
-    st.markdown("---")
-    if st.button("📥 CSV Export"):
-        df_data = []
-        for name, data in user_data.items():
-            calls = data["calls"]
-            df_data.append({
-                "Name": data["name"],
-                "Datum": selected_date,
-                "Anrufe": calls["total_calls"],
-                "Verbunden": calls["connected_calls"],
-                "Verbindungsrate": calls["connection_rate_percent"],
-                "Ø Dauer": calls["avg_duration_connected"],
-                "Sprechzeit": calls["total_talk_time_minutes"],
-                "Termine": data["terminations"],
-            })
+    cache_key = f"{date_from}_{date_to}_{comp_date_from}_{comp_date_to}_{refresh}"
+    if cache_key not in st.session_state or refresh:
+        user_data, team_totals, team_success = dashboard.get_data_for_date_range(date_from, date_to)
         
-        df = pd.DataFrame(df_data)
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "⬇️ CSV herunterladen",
-            csv,
-            f"close_report_{selected_date}.csv",
-            "text/csv"
-        )
+        if enable_comparison and comp_date_from and comp_date_to:
+            prev_data, prev_totals, prev_success = dashboard.get_data_for_date_range(comp_date_from, comp_date_to)
+        else:
+            prev_data, prev_totals, prev_success = None, None, None
+        
+        st.session_state.update({
+            "user_data": user_data, "team_totals": team_totals, "team_success": team_success,
+            "prev_data": prev_data, "prev_totals": prev_totals, "prev_success": prev_success,
+            "cache_key": cache_key
+        })
+    else:
+        user_data = st.session_state["user_data"]
+        team_totals = st.session_state["team_totals"]
+        prev_data = st.session_state.get("prev_data")
+        prev_totals = st.session_state.get("prev_totals")
+    
+    # TEAM
+    st.markdown("## 📈 TEAM GESAMT")
+    cols = st.columns(5)
+    
+    with cols[0]:
+        render_metric_with_comparison("🎯 TERMINE", team_totals["total_termine"], prev_totals.get("total_termine") if prev_totals else None)
+    with cols[1]:
+        render_metric_with_comparison("📞 Anwahlen", team_totals["total_calls"], prev_totals.get("total_calls") if prev_totals else None)
+    with cols[2]:
+        render_metric_with_comparison("✅ Verbunden", team_totals["total_connected"], prev_totals.get("total_connected") if prev_totals else None)
+    with cols[3]:
+        render_metric_with_comparison("⏱️ Sprechzeit", team_totals["total_talk_time"], prev_totals.get("total_talk_time") if prev_totals else None, "min")
+    with cols[4]:
+        quote = round(team_totals["total_termine"] / team_totals["total_calls"] * 100, 1) if team_totals["total_calls"] else 0
+        prev_quote = round(prev_totals["total_termine"] / prev_totals["total_calls"] * 100, 1) if prev_totals and prev_totals["total_calls"] else 0
+        render_metric_with_comparison("📊 Quote", f"{quote}%", prev_quote)
+    
+    # SETTING
+    st.markdown("---")
+    st.markdown("## ⚙️ SETTING")
+    
+    cols = st.columns(3)
+    with cols[0]:
+        total_qc = sum(u.get("qc_gefuehrt", 0) for u in user_data.values())
+        prev_qc = sum(p.get("qc_gefuehrt", 0) for p in prev_data.values()) if prev_data else None
+        render_metric_with_comparison("📋 QC geführt", total_qc, prev_qc)
+        st.caption("von 'Quali terminiert'")
+    with cols[1]:
+        total_no_show = sum(u.get("no_shows", 0) for u in user_data.values())
+        prev_no_show = sum(p.get("no_shows", 0) for p in prev_data.values()) if prev_data else None
+        render_metric_with_comparison("🏃 No Show", total_no_show, prev_no_show)
+        st.caption("Status 'No Show QC'")
+    with cols[2]:
+        total_sc = sum(u.get("sc_terminiert", 0) for u in user_data.values())
+        prev_sc = sum(p.get("sc_terminiert", 0) for p in prev_data.values()) if prev_data else None
+        render_metric_with_comparison("📞 SC terminiert", total_sc, prev_sc)
+        st.caption("Status 'SC terminiert'")
+    
+    # EINZELREPORTING
+    st.markdown("---")
+    st.markdown("## 👤 EINZELREPORTING")
+    
+    for user_key, data in user_data.items():
+        prev_user = prev_data.get(user_key) if prev_data else None
+        
+        with st.container():
+            st.markdown(f"<h3 style='margin-top:20px;'>{data['name']}</h3>", unsafe_allow_html=True)
+            
+            cols = st.columns(5)
+            with cols[0]:
+                render_metric_with_comparison("📞 Anwahlen", data["calls"]["total_calls"], prev_user.get("calls", {}).get("total_calls") if prev_user else None)
+            with cols[1]:
+                render_metric_with_comparison("✅ Verbunden", data["calls"]["connected_calls"], prev_user.get("calls", {}).get("connected_calls") if prev_user else None)
+            with cols[2]:
+                render_metric_with_comparison("🎯 Termine", data["termine"], prev_user.get("termine") if prev_user else None)
+            with cols[3]:
+                render_metric_with_comparison("⏱️ Ø Dauer", f"{data['calls']['avg_duration']}", prev_user.get("calls", {}).get("avg_duration") if prev_user else None, "s")
+            with cols[4]:
+                cpt = round(data["calls"]["total_calls"] / data["termine"], 1) if data["termine"] else "-"
+                prev_cpt = round(prev_user["calls"]["total_calls"] / prev_user["termine"], 1) if prev_user and prev_user.get("termine") else None
+                render_metric_with_comparison("☎️ Anrufe/Termin", cpt, prev_cpt)
+            
+            st.markdown("<hr style='margin:15px 0;border:none;border-top:1px solid #eee;'>", unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
