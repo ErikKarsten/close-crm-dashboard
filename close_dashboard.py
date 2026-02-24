@@ -398,6 +398,25 @@ def main():
         prev_quote = round(prev_totals["total_termine"] / prev_totals["total_calls"] * 100, 1) if prev_totals and prev_totals["total_calls"] else 0
         render_metric_with_comparison("📊 Quote", f"{quote}%", prev_quote)
     
+    # ERREICHT & QUOTEN
+    st.markdown("---")
+    st.markdown("## 📊 ERREICHT & QUOTEN")
+    cols = st.columns(4)
+    
+    with cols[0]:
+        render_metric_with_comparison("👔 VZ erreicht", team_totals["total_sekr"], prev_totals.get("total_sekr") if prev_totals else None)
+    with cols[1]:
+        render_metric_with_comparison("🎯 Entscheider erreicht", team_totals["total_connected"] - team_totals["total_sekr"], 
+                                     (prev_totals.get("total_connected", 0) - prev_totals.get("total_sekr", 0)) if prev_totals else None)
+    with cols[2]:
+        entscheider_quote = round(team_totals["total_termine"] / (team_totals["total_connected"] - team_totals["total_sekr"]) * 100, 1) if (team_totals["total_connected"] - team_totals["total_sekr"]) > 0 else 0
+        prev_eq = round(prev_totals["total_termine"] / (prev_totals["total_connected"] - prev_totals["total_sekr"]) * 100, 1) if prev_totals and (prev_totals["total_connected"] - prev_totals["total_sekr"]) > 0 else 0
+        render_metric_with_comparison("📈 Entscheider→Termin", f"{entscheider_quote}%", prev_eq)
+    with cols[3]:
+        vz_quote = round(team_totals["total_sekr"] / team_totals["total_calls"] * 100, 1) if team_totals["total_calls"] else 0
+        prev_vz = round(prev_totals["total_sekr"] / prev_totals["total_calls"] * 100, 1) if prev_totals and prev_totals["total_calls"] else 0
+        render_metric_with_comparison("📉 Brutto→VZ", f"{vz_quote}%", prev_vz)
+    
     # SETTING
     st.markdown("---")
     st.markdown("## ⚙️ SETTING")
@@ -442,6 +461,21 @@ def main():
                 cpt = round(data["calls"]["total_calls"] / data["termine"], 1) if data["termine"] else "-"
                 prev_cpt = round(prev_user["calls"]["total_calls"] / prev_user["termine"], 1) if prev_user and prev_user.get("termine") else None
                 render_metric_with_comparison("☎️ Anrufe/Termin", cpt, prev_cpt)
+            
+            # Zusätzliche Quoten pro User
+            cols2 = st.columns(4)
+            with cols2[0]:
+                render_metric_with_comparison("👔 VZ erreicht", data["sekr_erreicht"], prev_user.get("sekr_erreicht") if prev_user else None)
+            with cols2[1]:
+                render_metric_with_comparison("🎯 Entscheider", data["entscheider_erreicht"], prev_user.get("entscheider_erreicht") if prev_user else None)
+            with cols2[2]:
+                brutto_vz = data["quotas"]["brutto_to_entscheider"]
+                prev_brutto_vz = prev_user["quotas"]["brutto_to_entscheider"] if prev_user else None
+                render_metric_with_comparison("📉 Brutto→Entscheider", f"{brutto_vz}%", prev_brutto_vz)
+            with cols2[3]:
+                entsch_term = data["quotas"]["entscheider_to_termin"]
+                prev_entsch_term = prev_user["quotas"]["entscheider_to_termin"] if prev_user else None
+                render_metric_with_comparison("📈 Entscheider→Termin", f"{entsch_term}%", prev_entsch_term)
             
             st.markdown("<hr style='margin:15px 0;border:none;border-top:1px solid #eee;'>", unsafe_allow_html=True)
 
