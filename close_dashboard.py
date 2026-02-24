@@ -395,15 +395,6 @@ def main():
         login_page()
         return
     
-    # Auto-Refresh alle 5 Minuten (300 Sekunden)
-    if "last_refresh" not in st.session_state:
-        st.session_state["last_refresh"] = time.time()
-    
-    current_time = time.time()
-    if current_time - st.session_state["last_refresh"] > 300:  # 5 Minuten
-        st.session_state["last_refresh"] = current_time
-        st.rerun()
-    
     # Sidebar
     with st.sidebar:
         if st.button("🔒 Abmelden"):
@@ -415,13 +406,54 @@ def main():
         date_from, date_to = get_date_range_from_preset(preset)
         st.info(f"📅 {date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}")
         
-        # Auto-Refresh Status
-        next_refresh = 300 - (current_time - st.session_state["last_refresh"])
-        st.caption(f"🔄 Auto-Refresh in {int(next_refresh/60)}:{int(next_refresh%60):02d} min")
+        # JavaScript Countdown für sichtbaren Timer
+        st.markdown("""
+            <script>
+            (function() {
+                // Countdown für 5 Minuten (300 Sekunden)
+                let timeLeft = 300;
+                const countdownEl = document.createElement('div');
+                countdownEl.id = 'refresh-countdown';
+                countdownEl.style.cssText = 'background:#2c3e50;padding:10px 15px;border-radius:8px;margin-top:10px;text-align:center;font-family:monospace;font-size:14px;';
+                
+                function updateCountdown() {
+                    const minutes = Math.floor(timeLeft / 60);
+                    const seconds = timeLeft % 60;
+                    const color = timeLeft < 60 ? '#e74c3c' : (timeLeft < 120 ? '#f39c12' : '#27ae60');
+                    countdownEl.innerHTML = `
+                        <div style="color:#888;font-size:11px;margin-bottom:5px;">🔄 Auto-Refresh in</div>
+                        <div style="color:${color};font-size:20px;font-weight:bold;">
+                            ${minutes}:${seconds.toString().padStart(2, '0')}
+                        </div>
+                    `;
+                    
+                    if (timeLeft <= 0) {
+                        window.location.reload();
+                    } else {
+                        timeLeft--;
+                    }
+                }
+                
+                // Container im Sidebar finden (erstes div mit st-emotion-cache)
+                const sidebar = document.querySelector('[data-testid="stSidebar"]');
+                if (sidebar) {
+                    const container = sidebar.querySelector('.element-container:last-child');
+                    if (container) {
+                        container.appendChild(countdownEl);
+                        updateCountdown();
+                        setInterval(updateCountdown, 1000);
+                    }
+                }
+            })();
+            </script>
+            <div id="countdown-fallback" style="background:#2c3e50;padding:10px;border-radius:8px;margin-top:10px;text-align:center;">
+                <div style="color:#888;font-size:11px;">🔄 Auto-Refresh alle 5 Minuten</div>
+            </div>
+        """, unsafe_allow_html=True)
         
-        refresh = st.button("🔄 Aktualisieren", use_container_width=True)
+        refresh = st.button("🔄 Jetzt Aktualisieren", use_container_width=True)
         if refresh:
-            st.session_state["last_refresh"] = current_time
+            st.rerun()
     
     # Header
     st.markdown(f"""
