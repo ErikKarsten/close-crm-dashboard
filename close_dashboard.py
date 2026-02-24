@@ -182,8 +182,9 @@ class DashboardData:
             
             entscheider_erreicht = termine + kein_interesse
             
-            # Termin-Realisierungsquote: Termine - NoShows + SC / Termine
-            termine_stattgefunden = termine - no_shows + sc_term
+            # Termin-Realisierungsquote: (Termine - NoShows) / Termine
+            # Nur Termine die NICHT NoShow wurden zählen als stattgefunden
+            termine_stattgefunden = termine - no_shows
             termin_realisierung = round(termine_stattgefunden / termine * 100, 1) if termine > 0 else 0
             
             total_calls = call_metrics["total_calls"]
