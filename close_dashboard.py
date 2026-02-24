@@ -278,22 +278,49 @@ def render_comparison_badge(current: float, previous: float):
     diff = current - previous
     color = "#27ae60" if diff > 0 else "#e74c3c"
     arrow = "↑" if diff > 0 else "↓"
-    return f"<span style='color:{color};font-size:11px;font-weight:bold;margin-left:5px;'> {arrow} {int(previous)}</span>"
+    return f"<span style='color:{color};font-size:12px;font-weight:bold;margin-left:5px;'> {arrow} {int(previous)}</span>"
 
 
-def render_metric_with_comparison(label: str, value, prev_value=None, unit: str = ""):
+def render_metric_card(label: str, value, prev_value=None, unit: str = "", 
+                       color_theme: str = "blue", icon: str = ""):
+    """
+    Farbthemen:
+    - blue: Aktivitäten (Anrufe, Verbunden)
+    - green: Erfolge (Termine, VZ erreicht)
+    - orange: Quoten/Prozente
+    - purple: Sonstiges (Sprechzeit, QC)
+    - red: Probleme (No Shows)
+    """
+    colors = {
+        "blue": {"bg": "#e3f2fd", "border": "#2196f3", "text": "#1976d2"},
+        "green": {"bg": "#e8f5e9", "border": "#4caf50", "text": "#2e7d32"},
+        "orange": {"bg": "#fff3e0", "border": "#ff9800", "text": "#f57c00"},
+        "purple": {"bg": "#f3e5f5", "border": "#9c27b0", "text": "#7b1fa2"},
+        "red": {"bg": "#ffebee", "border": "#f44336", "text": "#c62828"},
+        "teal": {"bg": "#e0f2f1", "border": "#009688", "text": "#00695c"},
+    }
+    
+    theme = colors.get(color_theme, colors["blue"])
     comparison = ""
     if prev_value is not None and prev_value != 0:
         comparison = render_comparison_badge(value, prev_value)
     
     st.markdown(f"""
-        <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:5px 0;border-left:3px solid #3498db;">
-            <div style="font-size:12px;color:#666;text-transform:uppercase;">{label}</div>
-            <div style="font-size:28px;font-weight:bold;color:#2c3e50;display:flex;align-items:center;">
+        <div style="background:{theme['bg']};padding:20px;border-radius:12px;margin:5px 0;
+                    border-left:5px solid {theme['border']};box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <div style="font-size:13px;color:#666;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">
+                {icon} {label}
+            </div>
+            <div style="font-size:32px;font-weight:bold;color:{theme['text']};display:flex;align-items:center;margin-top:8px;">
                 {value}{unit}{comparison}
             </div>
         </div>
     """, unsafe_allow_html=True)
+
+
+# Legacy function for backwards compatibility
+def render_metric_with_comparison(label: str, value, prev_value=None, unit: str = ""):
+    render_metric_card(label, value, prev_value, unit, "blue")
 
 
 def main():
@@ -381,62 +408,97 @@ def main():
         prev_data = st.session_state.get("prev_data")
         prev_totals = st.session_state.get("prev_totals")
     
-    # TEAM
-    st.markdown("## 📈 TEAM GESAMT")
-    cols = st.columns(5)
-    
-    with cols[0]:
-        render_metric_with_comparison("🎯 TERMINE", team_totals["total_termine"], prev_totals.get("total_termine") if prev_totals else None)
-    with cols[1]:
-        render_metric_with_comparison("📞 Anwahlen", team_totals["total_calls"], prev_totals.get("total_calls") if prev_totals else None)
-    with cols[2]:
-        render_metric_with_comparison("✅ Verbunden", team_totals["total_connected"], prev_totals.get("total_connected") if prev_totals else None)
-    with cols[3]:
-        render_metric_with_comparison("⏱️ Sprechzeit", team_totals["total_talk_time"], prev_totals.get("total_talk_time") if prev_totals else None, "min")
-    with cols[4]:
-        quote = round(team_totals["total_termine"] / team_totals["total_calls"] * 100, 1) if team_totals["total_calls"] else 0
-        prev_quote = round(prev_totals["total_termine"] / prev_totals["total_calls"] * 100, 1) if prev_totals and prev_totals["total_calls"] else 0
-        render_metric_with_comparison("📊 Quote", f"{quote}%", prev_quote)
-    
-    # ERREICHT & QUOTEN
-    st.markdown("---")
-    st.markdown("## 📊 ERREICHT & QUOTEN")
+    # TEAM ÜBERSICHT - HAUPTMETRIKEN
+    st.markdown("## 🎯 HAUPTERGEBNISSE")
     cols = st.columns(4)
     
     with cols[0]:
-        render_metric_with_comparison("👔 VZ erreicht", team_totals["total_sekr"], prev_totals.get("total_sekr") if prev_totals else None)
+        render_metric_card("TERMINE", team_totals["total_termine"], 
+                          prev_totals.get("total_termine") if prev_totals else None,
+                          color_theme="green", icon="🎯")
     with cols[1]:
-        render_metric_with_comparison("🎯 Entscheider erreicht", team_totals["total_connected"] - team_totals["total_sekr"], 
-                                     (prev_totals.get("total_connected", 0) - prev_totals.get("total_sekr", 0)) if prev_totals else None)
+        render_metric_card("Anwahlen", team_totals["total_calls"], 
+                          prev_totals.get("total_calls") if prev_totals else None,
+                          color_theme="blue", icon="📞")
     with cols[2]:
+        render_metric_card("Verbunden", team_totals["total_connected"], 
+                          prev_totals.get("total_connected") if prev_totals else None,
+                          color_theme="teal", icon="✅")
+    with cols[3]:
+        render_metric_card("Sprechzeit", team_totals["total_talk_time"], 
+                          prev_totals.get("total_talk_time") if prev_totals else None,
+                          unit=" min", color_theme="purple", icon="⏱️")
+    
+    # QUOTEN - ORANGE HINTERGRUND
+    st.markdown("---")
+    st.markdown("## 📊 QUOTEN & KONVERSION")
+    cols = st.columns(4)
+    
+    with cols[0]:
+        quote = round(team_totals["total_termine"] / team_totals["total_calls"] * 100, 1) if team_totals["total_calls"] else 0
+        prev_quote = round(prev_totals["total_termine"] / prev_totals["total_calls"] * 100, 1) if prev_totals and prev_totals["total_calls"] else 0
+        render_metric_card("Brutto→Termin", f"{quote}%", prev_quote, 
+                          color_theme="orange", icon="📈")
+    with cols[1]:
         entscheider_quote = round(team_totals["total_termine"] / (team_totals["total_connected"] - team_totals["total_sekr"]) * 100, 1) if (team_totals["total_connected"] - team_totals["total_sekr"]) > 0 else 0
         prev_eq = round(prev_totals["total_termine"] / (prev_totals["total_connected"] - prev_totals["total_sekr"]) * 100, 1) if prev_totals and (prev_totals["total_connected"] - prev_totals["total_sekr"]) > 0 else 0
-        render_metric_with_comparison("📈 Entscheider→Termin", f"{entscheider_quote}%", prev_eq)
-    with cols[3]:
+        render_metric_card("Entscheider→Termin", f"{entscheider_quote}%", prev_eq,
+                          color_theme="orange", icon="🎯")
+    with cols[2]:
         vz_quote = round(team_totals["total_sekr"] / team_totals["total_calls"] * 100, 1) if team_totals["total_calls"] else 0
         prev_vz = round(prev_totals["total_sekr"] / prev_totals["total_calls"] * 100, 1) if prev_totals and prev_totals["total_calls"] else 0
-        render_metric_with_comparison("📉 Brutto→VZ", f"{vz_quote}%", prev_vz)
+        render_metric_card("Brutto→VZ", f"{vz_quote}%", prev_vz,
+                          color_theme="orange", icon="📉")
+    with cols[3]:
+        conn_rate = round(team_totals["total_connected"] / team_totals["total_calls"] * 100, 1) if team_totals["total_calls"] else 0
+        prev_conn = round(prev_totals["total_connected"] / prev_totals["total_calls"] * 100, 1) if prev_totals and prev_totals["total_calls"] else 0
+        render_metric_card("Connection Rate", f"{conn_rate}%", prev_conn,
+                          color_theme="orange", icon="📞")
     
-    # SETTING
+    # ERREICHTE KONTAKTE - GRÜN/BLAU MIX
     st.markdown("---")
-    st.markdown("## ⚙️ SETTING")
-    
+    st.markdown("## 👔 ERREICHTE KONTAKTE")
     cols = st.columns(3)
+    
+    with cols[0]:
+        render_metric_card("VZ erreicht", team_totals["total_sekr"], 
+                          prev_totals.get("total_sekr") if prev_totals else None,
+                          color_theme="green", icon="👔")
+    with cols[1]:
+        entscheider = team_totals["total_connected"] - team_totals["total_sekr"]
+        prev_entscheider = (prev_totals.get("total_connected", 0) - prev_totals.get("total_sekr", 0)) if prev_totals else None
+        render_metric_card("Entscheider erreicht", entscheider, prev_entscheider,
+                          color_theme="teal", icon="🎯")
+    with cols[2]:
+        render_metric_card("Kein Interesse", team_totals["total_kein_interesse"],
+                          prev_totals.get("total_kein_interesse") if prev_totals else None,
+                          color_theme="red", icon="❌")
+    
+    # SETTING - FORTSCHRITT
+    st.markdown("---")
+    st.markdown("## 🔄 QUALIFIZIERUNG & VERKAUFSZYKLUS")
+    
+    cols = st.columns(4)
     with cols[0]:
         total_qc = sum(u.get("qc_gefuehrt", 0) for u in user_data.values())
         prev_qc = sum(p.get("qc_gefuehrt", 0) for p in prev_data.values()) if prev_data else None
-        render_metric_with_comparison("📋 QC geführt", total_qc, prev_qc)
-        st.caption("von 'Quali terminiert'")
+        render_metric_card("QC geführt", total_qc, prev_qc,
+                          color_theme="purple", icon="📋")
     with cols[1]:
-        total_no_show = sum(u.get("no_shows", 0) for u in user_data.values())
-        prev_no_show = sum(p.get("no_shows", 0) for p in prev_data.values()) if prev_data else None
-        render_metric_with_comparison("🏃 No Show", total_no_show, prev_no_show)
-        st.caption("Status 'No Show QC'")
-    with cols[2]:
         total_sc = sum(u.get("sc_terminiert", 0) for u in user_data.values())
         prev_sc = sum(p.get("sc_terminiert", 0) for p in prev_data.values()) if prev_data else None
-        render_metric_with_comparison("📞 SC terminiert", total_sc, prev_sc)
-        st.caption("Status 'SC terminiert'")
+        render_metric_card("SC terminiert", total_sc, prev_sc,
+                          color_theme="green", icon="📞")
+    with cols[2]:
+        total_no_show = sum(u.get("no_shows", 0) for u in user_data.values())
+        prev_no_show = sum(p.get("no_shows", 0) for p in prev_data.values()) if prev_data else None
+        render_metric_card("No Shows", total_no_show, prev_no_show,
+                          color_theme="red", icon="🏃")
+    with cols[3]:
+        showup_rate = round((team_totals["total_termine"] - total_no_show) / team_totals["total_termine"] * 100, 1) if team_totals["total_termine"] else 0
+        prev_showup = round((prev_totals.get("total_termine", 0) - (prev_no_show or 0)) / prev_totals.get("total_termine", 1) * 100, 1) if prev_totals else None
+        render_metric_card("Show-up Rate", f"{showup_rate}%", prev_showup,
+                          color_theme="green", icon="✅")
     
     # EINZELREPORTING
     st.markdown("---")
@@ -448,34 +510,62 @@ def main():
         with st.container():
             st.markdown(f"<h3 style='margin-top:20px;'>{data['name']}</h3>", unsafe_allow_html=True)
             
-            cols = st.columns(5)
+            # ERGEBNISSE
+            cols = st.columns(4)
             with cols[0]:
-                render_metric_with_comparison("📞 Anwahlen", data["calls"]["total_calls"], prev_user.get("calls", {}).get("total_calls") if prev_user else None)
+                render_metric_card("Termine", data["termine"], prev_user.get("termine") if prev_user else None,
+                                  color_theme="green", icon="🎯")
             with cols[1]:
-                render_metric_with_comparison("✅ Verbunden", data["calls"]["connected_calls"], prev_user.get("calls", {}).get("connected_calls") if prev_user else None)
+                render_metric_card("Anwahlen", data["calls"]["total_calls"], 
+                                  prev_user.get("calls", {}).get("total_calls") if prev_user else None,
+                                  color_theme="blue", icon="📞")
             with cols[2]:
-                render_metric_with_comparison("🎯 Termine", data["termine"], prev_user.get("termine") if prev_user else None)
+                render_metric_card("Verbunden", data["calls"]["connected_calls"], 
+                                  prev_user.get("calls", {}).get("connected_calls") if prev_user else None,
+                                  color_theme="teal", icon="✅")
             with cols[3]:
-                render_metric_with_comparison("⏱️ Ø Dauer", f"{data['calls']['avg_duration']}", prev_user.get("calls", {}).get("avg_duration") if prev_user else None, "s")
-            with cols[4]:
                 cpt = round(data["calls"]["total_calls"] / data["termine"], 1) if data["termine"] else "-"
                 prev_cpt = round(prev_user["calls"]["total_calls"] / prev_user["termine"], 1) if prev_user and prev_user.get("termine") else None
-                render_metric_with_comparison("☎️ Anrufe/Termin", cpt, prev_cpt)
+                render_metric_card("Anrufe/Termin", cpt, prev_cpt, 
+                                  color_theme="purple", icon="☎️")
             
-            # Zusätzliche Quoten pro User
-            cols2 = st.columns(4)
+            # ERREICHTE KONTAKTE
+            cols2 = st.columns(3)
             with cols2[0]:
-                render_metric_with_comparison("👔 VZ erreicht", data["sekr_erreicht"], prev_user.get("sekr_erreicht") if prev_user else None)
+                render_metric_card("VZ erreicht", data["sekr_erreicht"], 
+                                  prev_user.get("sekr_erreicht") if prev_user else None,
+                                  color_theme="green", icon="👔")
             with cols2[1]:
-                render_metric_with_comparison("🎯 Entscheider", data["entscheider_erreicht"], prev_user.get("entscheider_erreicht") if prev_user else None)
+                render_metric_card("Entscheider", data["entscheider_erreicht"], 
+                                  prev_user.get("entscheider_erreicht") if prev_user else None,
+                                  color_theme="teal", icon="🎯")
             with cols2[2]:
+                render_metric_card("Ø Dauer", f"{data['calls']['avg_duration']}", 
+                                  prev_user.get("calls", {}).get("avg_duration") if prev_user else None,
+                                  unit="s", color_theme="purple", icon="⏱️")
+            
+            # QUOTEN
+            cols3 = st.columns(4)
+            with cols3[0]:
                 brutto_vz = data["quotas"]["brutto_to_entscheider"]
                 prev_brutto_vz = prev_user["quotas"]["brutto_to_entscheider"] if prev_user else None
-                render_metric_with_comparison("📉 Brutto→Entscheider", f"{brutto_vz}%", prev_brutto_vz)
-            with cols2[3]:
+                render_metric_card("Brutto→Entscheider", f"{brutto_vz}%", prev_brutto_vz,
+                                  color_theme="orange", icon="📉")
+            with cols3[1]:
                 entsch_term = data["quotas"]["entscheider_to_termin"]
                 prev_entsch_term = prev_user["quotas"]["entscheider_to_termin"] if prev_user else None
-                render_metric_with_comparison("📈 Entscheider→Termin", f"{entsch_term}%", prev_entsch_term)
+                render_metric_card("Entscheider→Termin", f"{entsch_term}%", prev_entsch_term,
+                                  color_theme="orange", icon="📈")
+            with cols3[2]:
+                conn_rate = data["quotas"]["brutto_connected"]
+                prev_conn = prev_user["quotas"]["brutto_connected"] if prev_user else None
+                render_metric_card("Connection Rate", f"{conn_rate}%", prev_conn,
+                                  color_theme="orange", icon="📞")
+            with cols3[3]:
+                brutto_term = data["quotas"]["brutto_to_termin"]
+                prev_brutto_term = prev_user["quotas"]["brutto_to_termin"] if prev_user else None
+                render_metric_card("Brutto→Termin", f"{brutto_term}%", prev_brutto_term,
+                                  color_theme="orange", icon="🎯")
             
             st.markdown("<hr style='margin:15px 0;border:none;border-top:1px solid #eee;'>", unsafe_allow_html=True)
 
