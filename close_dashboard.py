@@ -88,6 +88,28 @@ class CloseAPI:
         with urllib.request.urlopen(req, timeout=30) as response:
             return json.loads(response.read().decode())
 
+    def get_leads_by_status(self, status_id: str) -> int:
+        """Zähle alle Leads mit einem bestimmten Status"""
+        count = 0
+        skip = 0
+        limit = 100
+        
+        while True:
+            params = {"status_id": status_id, "_limit": str(limit), "_skip": str(skip)}
+            try:
+                data = self._get_cached("lead/", tuple(sorted(params.items())))
+                batch = data.get("data", [])
+                count += len(batch)
+            except:
+                break
+            if len(batch) < limit:
+                break
+            skip += limit
+            if skip > 5000:  # Safety brake
+                break
+        
+        return count
+
     def get_all_activities(self, date_from: str, date_to: str, activity_type: Optional[str] = None) -> List[Dict]:
         activities = []
         skip = 0
@@ -169,12 +191,14 @@ class DashboardData:
             no_shows = 0
             sc_term = 0
             
-            for activity in status_changes:
-                if activity.get("user_id") != user_id:
-                    continue
+            # ALLE Activities dieses Users zählen (nicht nur Changes)
+            user_activities = [a for a in status_changes if a.get("user_id") == user_id]
+            
+            for activity in user_activities:
                 new_status = activity.get("new_status_id")
                 old_label = activity.get("old_status_label", "").lower()
                 
+                # WICHTIG: Wir zählen alle Activities, wo der Status gesetzt wurde
                 if new_status == STATUS_CONFIG["sekr_erreicht"]:
                     sekr_erreicht += 1
                 elif new_status == STATUS_CONFIG["entscheider_kein_interesse"]:
@@ -189,8 +213,7 @@ class DashboardData:
                 if "quali terminiert" in old_label:
                     qc_gefuehrt += 1
             
-            # Berechnung: Entscheider erreicht = Termine + Kein Interesse
-            # (Wenn Termin gelegt oder Absage vom Entscheider = Entscheider wurde erreicht)
+            # Berechnung Entscheider: Termine + Kein Interesse
             entscheider_erreicht = termine + kein_interesse
             
             total_calls = call_metrics["total_calls"]
