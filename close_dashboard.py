@@ -189,8 +189,9 @@ class DashboardData:
                 if "quali terminiert" in old_label:
                     qc_gefuehrt += 1
             
-            # Berechnung: Entscheider = Verbunden - VZ - Kein Interesse
-            entscheider_erreicht = max(0, call_metrics["connected_calls"] - sekr_erreicht - kein_interesse)
+            # Berechnung: Entscheider erreicht = Termine + Kein Interesse
+            # (Wenn Termin gelegt oder Absage vom Entscheider = Entscheider wurde erreicht)
+            entscheider_erreicht = termine + kein_interesse
             
             total_calls = call_metrics["total_calls"]
             
