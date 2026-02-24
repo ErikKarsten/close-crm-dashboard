@@ -19,7 +19,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-st.set_page_config(page_title="Close CRM Dashboard", page_icon="🦞", layout="wide")
+st.set_page_config(page_title="Vertriebsreporting", page_icon="🦞", layout="wide")
 
 BASE_URL = "https://api.close.com/api/v1"
 
@@ -54,7 +54,7 @@ def login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<div style='text-align:center;padding:60px 40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:20px;color:white;'>", unsafe_allow_html=True)
-        st.markdown("<h1>🦞 Close CRM</h1>", unsafe_allow_html=True)
+        st.markdown("<h1>🦞 Vertriebsreporting</h1>", unsafe_allow_html=True)
         st.markdown("<h3>Vertriebler Dashboard</h3>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -430,7 +430,7 @@ def main():
     # Header
     st.markdown(f"""
         <div style="background:linear-gradient(90deg,#1a1a2e 0%,#16213e 100%);padding:30px;border-radius:15px;margin-bottom:30px;">
-            <h1 style="color:white;margin:0;">🦞 Close CRM Dashboard</h1>
+            <h1 style="color:white;margin:0;">🦞 Vertriebsreporting</h1>
             <p style="color:#888;margin:10px 0 0 0;">{date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}</p>
         </div>
     """, unsafe_allow_html=True)
