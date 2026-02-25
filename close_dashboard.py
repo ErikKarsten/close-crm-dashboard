@@ -297,21 +297,6 @@ def create_user_cards(user_data: Dict):
                 st.metric("📈 Entscheider→Termin", f"{entsch_quote}%")
                 st.caption(f"👔 {data['sekr_erreicht']} VZ | 🎯 {data['entscheider_erreicht']} Entscheider")
             
-            # 5. WERT: Termin-Realisierungsquote (zentriert)
-            st.markdown("---")
-            col1, col2, col3 = st.columns([1, 2, 1])
-            
-            with col2:
-                # Termin-Realisierungsquote mit Farbcodierung
-                real_color = "#27ae60" if data['termin_realisierung'] >= 70 else ("#f39c12" if data['termin_realisierung'] >= 50 else "#e74c3c")
-                st.markdown(f"""
-                    <div style="background:{real_color}15;border:2px solid {real_color};border-radius:10px;padding:15px;text-align:center;">
-                        <div style="font-size:12px;color:#888;">✅ TERMIN-REALISIERUNG</div>
-                        <div style="font-size:32px;font-weight:bold;color:{real_color};">{data['termin_realisierung']}%</div>
-                        <div style="font-size:11px;color:#666;">{data['termine_stattgefunden']}/{data['termine']} Termine stattgefunden</div>
-                    </div>
-                """, unsafe_allow_html=True)
-            
             st.markdown("---")
 
 
