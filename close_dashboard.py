@@ -19,7 +19,7 @@ import plotly.graph_objects as go
 st.set_page_config(page_title="Vertriebsreporting", page_icon="🦞", layout="wide")
 
 BASE_URL = "https://api.close.com/api/v1"
-ENCRYPTED_API_KEY = "api_15xJDAtA0YSbaoN65AfRiJ.2Xj7MdPmR4AjjCbSyW9T9t"
+ENCRYPTED_API_KEY = "api_00AGgmH6uDK3QhKNrzmJMy.1WfDbeEAC76sPl5te2wcef"
 CORRECT_PASSWORD_HASH = "088d2a3bb2d70f11bdb7c138875851e0369a04d23f7697501cbacfb1b6604391"
 
 STATUS_CONFIG = {
